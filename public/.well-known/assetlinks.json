@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.vercel.task_kq62l8ta4_distortedvirgo_clouds_projects.twa",
+    "sha256_cert_fingerprints": ["92:36:96:59:3E:44:2B:E8:86:CB:83:A9:25:29:29:2B:8C:6E:49:6B:F2:6D:AD:47:95:7D:5B:5E:98:CC:92:31"]
+  }
+}]
