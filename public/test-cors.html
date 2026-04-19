@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<body>
+<script>
+fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer dummy',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({ model: 'gemini-3.1-flash-lite-preview', messages: [{role: 'user', content: 'hi'}] })
+}).then(res => res.json()).then(console.log).catch(console.error);
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "name": "QuestLog",
+  "description": "Gamified task manager where you earn XP and fight bosses.",
+  "requestFramePermissions": []
+}
