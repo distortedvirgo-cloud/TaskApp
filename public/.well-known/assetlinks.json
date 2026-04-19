@@ -2,7 +2,7 @@
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "app.vercel.task_kq62l8ta4_distortedvirgo_clouds_projects.twa",
-    "sha256_cert_fingerprints": ["92:36:96:59:3E:44:2B:E8:86:CB:83:A9:25:29:29:2B:8C:6E:49:6B:F2:6D:AD:47:95:7D:5B:5E:98:CC:92:31"]
+    "package_name": "app.vercel.task_app_five_taupe.twa",
+    "sha256_cert_fingerprints": ["36:5F:03:F3:AF:19:83:9B:55:55:A3:6C:FD:48:1F:3B:A2:51:5C:B8:E2:D9:77:07:6A:20:CA:71:0E:C8:CE:97"]
   }
 }]
