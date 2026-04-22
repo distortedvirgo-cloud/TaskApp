@@ -55,7 +55,7 @@ export const getOpenAIClient = (apiKey: string, baseUrl?: string) => {
             contents: { parts: [{ text: params.prompt }] },
             config: {
               // @ts-ignore
-              imageConfig: { aspectRatio: "1:1" }
+              imageConfig: { aspectRatio: params.aspectRatio || "1:1" }
             }
           });
           const part = response.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
@@ -386,7 +386,7 @@ export const evaluateTasksBatchWithAI = async (apiKey: string, baseUrl: string, 
 
     console.log("[AI Evaluation] Successfully evaluated tasks batch.");
     return data as {
-      results: { xp: number, statXp: number, suggestedStat: StatType }[],
+      results: { xp: number, statXp: number, suggestedStat: StatType, gold?: number, difficulty?: number }[],
       gmComment: string
     };
   } catch (error) {
@@ -442,6 +442,8 @@ export const evaluateTaskWithAI = async (apiKey: string, baseUrl: string, model:
     return {
       xp: data.xp,
       statXp: data.statXp,
+      gold: data.gold,
+      difficulty: data.difficulty,
       suggestedStat: data.suggestedStat as StatType || stat,
       gmComment: data.gmComment || "Отличная работа! Продолжай в том же духе."
     };
@@ -504,6 +506,7 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
             "name": "Trophy Name in Russian",
             "description": "Short lore description in Russian.",
             "icon": "A single emoji representing the trophy",
+            "imagePrompt": "A short English prompt for an AI image generator to create a 2D fantasy game UI icon for this trophy. Isolated on dark background.",
             "effect": {
               "type": "xp_boost" | "damage_boost" | "boss_hp_reduction",
               "targetStat": "strength" | "intelligence" | "charisma" | "willpower" | null,
@@ -522,6 +525,7 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
             "name": "Epic Trophy Name in Russian",
             "description": "Short lore description in Russian.",
             "icon": "A single emoji representing the trophy",
+            "imagePrompt": "A short English prompt for an AI image generator to create a 2D fantasy game UI epic icon for this item. Isolated on dark background.",
             "effect": {
               "type": "xp_boost" | "damage_boost" | "boss_hp_reduction",
               "targetStat": "strength" | "intelligence" | "charisma" | "willpower" | null,
@@ -624,7 +628,7 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
   }
 };
 
-export const generateAIImage = async (apiKey: string, baseUrl: string, model: string, prompt: string, enabled: boolean = true) => {
+export const generateAIImage = async (apiKey: string, baseUrl: string, model: string, prompt: string, enabled: boolean = true, aspectRatio: string = "1:1") => {
   if (!enabled) {
     console.log("[AI Image] Генерация изображений отключена в настройках разработчика.");
     return null;
@@ -642,7 +646,8 @@ export const generateAIImage = async (apiKey: string, baseUrl: string, model: st
       model: model || "dall-e-3",
       prompt: prompt,
       n: 1,
-      size: "1024x1024",
+      size: "1024x1024", // Ignored by Gemini wrapper, used as fallback for real OpenAI
+      aspectRatio: aspectRatio, // Passed to Gemini wrapper
       response_format: "b64_json",
       // @ts-ignore - nano-gpt specific parameters
       guidance_scale: 7.5,

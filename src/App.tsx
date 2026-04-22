@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sword, CheckCircle, Circle, Plus, Trash2, Trophy, Skull, User, Flame, Target, Shield, Book, Heart, Zap, Clock, AlertCircle, Settings, Bot, X, Loader2, RefreshCw, AlertTriangle, Download, HelpCircle, ChevronUp, ChevronDown, Eye, ShoppingBag, Coins } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateTasks, generateAITrophy, getOpenAIClient } from './lib/ai';
+import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateTasks, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics } from './lib/ai';
 
 export type StatType = 'strength' | 'intelligence' | 'charisma' | 'willpower' | 'unknown';
 
@@ -21,53 +21,67 @@ const STATS: Record<StatType, { name: string; icon: React.ElementType; color: st
 
 const THEME_COLORS = {
   slate: {
-    text: 'text-slate-400',
-    border: 'border-slate-400',
+    text: 'text-slate-300',
+    border: 'border-slate-500/30',
     bg: 'bg-slate-400',
-    shadow: 'shadow-[0_0_10px_rgba(148,163,184,0.5)]',
-    dropShadow: 'drop-shadow-[0_0_8px_rgba(148,163,184,0.5)]'
+    bgTransparent: 'bg-slate-500/10',
+    shadow: 'shadow-[0_0_20px_rgba(148,163,184,0.15)]',
+    dropShadow: 'drop-shadow-[0_0_8px_rgba(148,163,184,0.5)]',
+    gradient: 'from-slate-400 to-slate-800'
   },
   emerald: {
     text: 'text-emerald-400',
-    border: 'border-emerald-400',
+    border: 'border-emerald-500/40',
     bg: 'bg-emerald-400',
-    shadow: 'shadow-[0_0_10px_rgba(52,211,153,0.5)]',
-    dropShadow: 'drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]'
+    bgTransparent: 'bg-emerald-500/10',
+    shadow: 'shadow-[0_0_20px_rgba(52,211,153,0.15)]',
+    dropShadow: 'drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]',
+    gradient: 'from-emerald-400 to-emerald-800'
   },
   rose: {
     text: 'text-rose-400',
-    border: 'border-rose-400',
+    border: 'border-rose-500/40',
     bg: 'bg-rose-400',
-    shadow: 'shadow-[0_0_10px_rgba(251,113,133,0.5)]',
-    dropShadow: 'drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]'
+    bgTransparent: 'bg-rose-500/10',
+    shadow: 'shadow-[0_0_20px_rgba(251,113,133,0.15)]',
+    dropShadow: 'drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]',
+    gradient: 'from-rose-400 to-rose-800'
   },
   amber: {
     text: 'text-amber-400',
-    border: 'border-amber-400',
+    border: 'border-amber-500/40',
     bg: 'bg-amber-400',
-    shadow: 'shadow-[0_0_10px_rgba(251,191,36,0.5)]',
-    dropShadow: 'drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]'
+    bgTransparent: 'bg-amber-500/10',
+    shadow: 'shadow-[0_0_20px_rgba(251,191,36,0.15)]',
+    dropShadow: 'drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]',
+    gradient: 'from-amber-400 to-amber-800'
   },
   blue: {
     text: 'text-blue-400',
-    border: 'border-blue-400',
+    border: 'border-blue-500/40',
     bg: 'bg-blue-400',
-    shadow: 'shadow-[0_0_10px_rgba(96,165,250,0.5)]',
-    dropShadow: 'drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]'
+    bgTransparent: 'bg-blue-500/10',
+    shadow: 'shadow-[0_0_20px_rgba(96,165,250,0.15)]',
+    dropShadow: 'drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]',
+    gradient: 'from-blue-400 to-blue-800'
   },
   purple: {
     text: 'text-purple-400',
-    border: 'border-purple-400',
+    border: 'border-purple-500/40',
     bg: 'bg-purple-400',
-    shadow: 'shadow-[0_0_10px_rgba(192,132,252,0.5)]',
-    dropShadow: 'drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]'
+    bgTransparent: 'bg-purple-500/10',
+    shadow: 'shadow-[0_0_20px_rgba(192,132,252,0.15)]',
+    dropShadow: 'drop-shadow-[0_0_8px_rgba(192,132,252,0.5)]',
+    gradient: 'from-purple-400 to-purple-800'
   },
   cyan: {
     text: 'text-cyan-400',
-    border: 'border-cyan-400',
+    border: 'border-cyan-500/40',
     bg: 'bg-cyan-400',
-    shadow: 'shadow-[0_0_10px_rgba(34,211,238,0.5)]',
-    dropShadow: 'drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]'
+    bgTransparent: 'bg-cyan-500/10',
+    shadow: 'shadow-[0_0_20px_rgba(34,211,238,0.15)]',
+    dropShadow: 'drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]',
+    gradient: 'from-cyan-400 to-cyan-800'
   }
 };
 
@@ -158,7 +172,6 @@ export type Player = {
   dailyPointsHistory?: Record<string, number>; // YYYY-MM-DD -> points
   playerClass?: string;
   familiar?: Familiar;
-  achievements?: string[];
 };
 
 export type Boss = {
@@ -265,7 +278,7 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
   // Generate random multipliers (one vulnerability x1.5, optionally one resistance x0.5)
   const stats: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
   const multipliers: Record<StatType, number> = {
-    strength: 1, intelligence: 1, charisma: 1, willpower: 1
+    strength: 1, intelligence: 1, charisma: 1, willpower: 1, unknown: 1
   };
   
   // Pick one weakness
@@ -280,6 +293,9 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
     }
     multipliers[resistance] = 0.5;
   }
+  
+  // ensure unknown exists for TS compliance
+  multipliers['unknown'] = 1;
 
   const daysToAdd = isMiniBoss ? 1 : 6;
   const expirationDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd, 23, 59, 59, 999);
@@ -331,14 +347,16 @@ const defaultStats = {
   strength: { level: 1, xp: 0 },
   intelligence: { level: 1, xp: 0 },
   charisma: { level: 1, xp: 0 },
-  willpower: { level: 1, xp: 0 }
+  willpower: { level: 1, xp: 0 },
+  unknown: { level: 1, xp: 0 }
 };
 
 const defaultPendingDamage = {
   strength: 0,
   intelligence: 0,
   charisma: 0,
-  willpower: 0
+  willpower: 0,
+  unknown: 0
 };
 
 export default function App() {
@@ -533,7 +551,7 @@ export default function App() {
   const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
   const [isCategorizingTasks, setIsCategorizingTasks] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [showStoryModal, setShowStoryModal] = useState(false);
   const [selectedTrophy, setSelectedTrophy] = useState<Trophy | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -798,7 +816,7 @@ export default function App() {
         if (analytics) {
           setGameState(prev => {
             // Calculate favorite and weakest stats
-            const stats = Object.entries(player.stats).map(([stat, data]) => ({ stat, level: data.level, xp: data.xp }));
+            const stats = Object.entries(player.stats).map(([stat, data]) => ({ stat, level: (data as {level: number, xp: number}).level, xp: (data as {level: number, xp: number}).xp }));
             stats.sort((a, b) => (b.level * 1000 + b.xp) - (a.level * 1000 + a.xp));
             const favorite_stat = stats[0].stat as StatType;
             const weakest_stat = stats[stats.length - 1].stat as StatType;
@@ -886,41 +904,6 @@ export default function App() {
 
     handleFamiliar();
   }, [player.combo, player.familiar, player.playerClass, aiSettings]);
-
-  // Achievement Logic
-  useEffect(() => {
-    const checkAchievements = () => {
-      const achievements = player.achievements || [];
-      const newAchievements: string[] = [];
-
-      if (player.level >= 10 && !achievements.includes('level_10')) {
-        newAchievements.push('level_10');
-        setGmMessage('Достижение разблокировано: Уровень 10! Вы становитесь сильнее.');
-      }
-      if (player.combo >= 7 && !achievements.includes('combo_7')) {
-        newAchievements.push('combo_7');
-        setGmMessage('Достижение разблокировано: Неделя без пропусков! Ваша воля непоколебима.');
-      }
-      if (player.gold >= 1000 && !achievements.includes('gold_1000')) {
-        newAchievements.push('gold_1000');
-        setGmMessage('Достижение разблокировано: 1000 Золота! Вы настоящий богач.');
-      }
-      if (gameState.chronicle.campaign_history.bosses_defeated >= 1 && !achievements.includes('first_boss')) {
-        newAchievements.push('first_boss');
-        setGmMessage('Достижение разблокировано: Первый босс повержен! Начало великого пути.');
-      }
-
-      if (newAchievements.length > 0) {
-        import('./lib/sfx').then(({ playSound }) => playSound('levelUp'));
-        setPlayer(prev => ({
-          ...prev,
-          achievements: [...(prev.achievements || []), ...newAchievements]
-        }));
-      }
-    };
-
-    checkAchievements();
-  }, [player.level, player.combo, player.gold, gameState.chronicle.campaign_history.bosses_defeated, player.achievements]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1530,13 +1513,27 @@ export default function App() {
            }
         }
 
-        // Generate enemy images
+        // Generate enemy images and their drops
         for (let enemy of aiCampaign.campaign.enemies) {
           if (enemy.imagePrompt) {
             try {
-              enemy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.imagePrompt, aiSettings.enableImages);
+              console.log("[Game] Requesting image for enemy:", enemy.name);
+              enemy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.imagePrompt, aiSettings.enableImages, "3:4");
             } catch (imgError) {
               console.error("Enemy image generation failed", imgError);
+            }
+          }
+          
+          if (enemy.dropTrophy) {
+            if (!enemy.dropTrophy.imagePrompt) {
+              console.log(`[Game] Missing imagePrompt for trophy ${enemy.dropTrophy.name}, generating fallback prompt`);
+              enemy.dropTrophy.imagePrompt = `A 2D fantasy game UI single icon for a magical item named "${enemy.dropTrophy.name}". Epic loot. Isolated on dark background, no text.`;
+            }
+            try {
+              console.log("[Game] Requesting image for trophy:", enemy.dropTrophy.name);
+              enemy.dropTrophy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.dropTrophy.imagePrompt, aiSettings.enableImages);
+            } catch (imgError) {
+              console.error("Trophy image generation failed", imgError);
             }
           }
         }
@@ -1664,7 +1661,7 @@ export default function App() {
       for (let enemy of aiCampaign.campaign.enemies) {
         if (enemy.imagePrompt) {
           try {
-            enemy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.imagePrompt, aiSettings.enableImages);
+            enemy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.imagePrompt, aiSettings.enableImages, "3:4");
           } catch (imgError) {
             console.error("Enemy image generation failed", imgError);
           }
@@ -1732,10 +1729,9 @@ export default function App() {
       <motion.div 
         animate={bossHit ? { x: [-10, 10, -10, 10, 0], y: [-5, 5, -5, 5, 0] } : {}}
         transition={{ duration: 0.4 }}
-        className="w-full max-w-md h-[100dvh] flex flex-col border-x border-white/5 bg-[#121216]/80 shadow-2xl relative overflow-hidden"
+        className="w-full max-w-md h-[100dvh] flex flex-col border-x border-white/5 bg-[#0B0E14] shadow-2xl relative overflow-hidden"
       >
-        
-        {/* Top Bar - Gold (Removed from here, only in shop now) */}
+        <div className={`absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].gradient : 'from-slate-900 to-[#0B0E14]'} -z-10 pointer-events-none transition-colors duration-1000`} />
         
         {/* API Error Toast */}
         <AnimatePresence>
@@ -1864,68 +1860,60 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Install App Modal */}
+        {/* Story Modal */}
         <AnimatePresence>
-          {showInstallModal && (
+          {showStoryModal && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowStoryModal(false)}
             >
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-[#131824] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#131824] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative overflow-hidden flex flex-col max-h-[80vh]"
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+                <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${campaign ? `from-[${THEME_COLORS[campaign.colorTheme || 'slate'].hex}]` : 'from-indigo-500'} to-transparent`}></div>
                 
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-4 shrink-0">
                   <h2 className="text-lg font-bold text-slate-200 flex items-center gap-2">
-                    <Download size={20} className="text-blue-400" />
-                    Установка приложения
+                    <Book size={20} className={campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-indigo-400'} />
+                    Летопись героя
                   </h2>
-                  <button onClick={() => setShowInstallModal(false)} className="text-slate-500 hover:text-slate-300">
+                  <button onClick={() => setShowStoryModal(false)} className="text-slate-500 hover:text-slate-300">
                     <X size={20} />
                   </button>
                 </div>
                 
-                <div className="space-y-4 text-sm text-slate-300">
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-200">
-                    Для установки необходимо открыть приложение в отдельной вкладке браузера (вне предпросмотра).
-                  </div>
-                  
-                  <a 
-                    href={window.location.href} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="block w-full py-3 bg-[#0B0E14] hover:bg-white/5 border border-white/10 rounded-xl text-center text-amber-400 font-medium transition-colors"
-                  >
-                    Открыть в новой вкладке ↗
-                  </a>
-
-                  <div className="space-y-2 mt-4">
-                    <h3 className="font-bold text-slate-200 flex items-center gap-2">
-                      <span>🍎</span> На iPhone (Safari):
-                    </h3>
-                    <p className="text-slate-400 pl-6">1. Откройте ссылку выше<br/>2. Нажмите кнопку «Поделиться» (квадрат со стрелочкой)<br/>3. Выберите «На экран "Домой"»</p>
-                  </div>
-
-                  <div className="space-y-2 mt-4">
-                    <h3 className="font-bold text-slate-200 flex items-center gap-2">
-                      <span>🤖</span> На Android (Chrome):
-                    </h3>
-                    <p className="text-slate-400 pl-6">1. Откройте ссылку выше<br/>2. Нажмите меню (три точки вверху)<br/>3. Выберите «Установить приложение» или «Добавить на гл. экран»</p>
-                  </div>
+                <div className="space-y-4 text-sm text-slate-300 overflow-y-auto custom-scrollbar flex-1 pr-2">
+                  <p className="leading-relaxed italic lore-text">
+                    {gameState.currentStory}
+                  </p>
+                  {boss?.description && (
+                    <>
+                      <div className="w-full h-px bg-white/10 my-3" />
+                      <div className="space-y-2">
+                        <span className="text-slate-300 font-bold mix-blend-screen block">О противнике:</span>
+                        <p className="leading-relaxed italic lore-text text-slate-400">
+                          {boss.description}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                <button
-                  onClick={() => setShowInstallModal(false)}
-                  className="w-full py-3 mt-6 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
-                >
-                  Понятно
-                </button>
+                <div className="shrink-0 mt-6 pt-4 border-t border-white/10">
+                  <button
+                    onClick={() => setShowStoryModal(false)}
+                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-colors"
+                  >
+                    Закрыть фолиант
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -2299,44 +2287,81 @@ export default function App() {
             <div className="flex flex-col min-h-full">
               <div className="space-y-6 flex-1">
                 
-                {/* Perfect Day Indicator */}
-              {availableDailyTasks.length > 0 && (
-                <div className={`glass-card p-4 flex items-center justify-between transition-all duration-500 ${isPerfectDay ? 'border-amber-400/50 shadow-[0_0_15px_rgba(251,191,36,0.2)]' : 'border-white/5'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-500 ${isPerfectDay ? 'bg-amber-400/20 text-amber-400' : 'bg-[#0B0E14] text-slate-500'}`}>
-                      <Zap size={20} className={isPerfectDay ? 'drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : ''} />
-                    </div>
-                    <div>
-                      <h3 className={`font-bold text-sm transition-colors duration-500 ${isPerfectDay ? 'text-amber-400' : 'text-slate-300'}`}>
-                        {isPerfectDay ? 'Полуночное Эхо заряжено!' : 'Идеальный день'}
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {isPerfectDay ? 'Босс получит бонусный урон ночью.' : 'Выполните все ежедневные задачи.'}
-                      </p>
-                    </div>
+                {/* Top Header */}
+                <div className="flex justify-between items-start gap-4">
+                  <div className="pt-1">
+                    <h2 className="text-[22px] font-bold text-white flex items-center gap-2 mb-1 drop-shadow-md">
+                      {new Date().getHours() >= 5 && new Date().getHours() < 12 ? 'Доброе утро!' : 
+                       new Date().getHours() >= 12 && new Date().getHours() < 18 ? 'Добрый день!' : 
+                       new Date().getHours() >= 18 && new Date().getHours() < 23 ? 'Добрый вечер!' : 'Доброй ночи!'} 
+                      <span className="text-xl">
+                        {new Date().getHours() >= 5 && new Date().getHours() < 12 ? '☀️' : 
+                         new Date().getHours() >= 12 && new Date().getHours() < 18 ? '🌤️' : 
+                         new Date().getHours() >= 18 && new Date().getHours() < 23 ? '🌆' : '🌙'}
+                      </span>
+                    </h2>
+                    <p className="text-sm text-slate-400 leading-snug">Сегодня отличный день<br/>для твоих побед.</p>
                   </div>
-                  <div className="text-right">
-                    <span className={`text-lg font-black transition-colors duration-500 ${isPerfectDay ? 'text-amber-400' : 'text-slate-400'}`}>
-                      {completedDailyTasks.length} / {availableDailyTasks.length}
-                    </span>
+                  
+                  <div className="flex flex-col relative pt-1">
+                    {(effectiveApiKey || effectiveAiBaseUrl) && (
+                      <button
+                        onClick={askMasterForAdvice}
+                        disabled={isGeneratingTasks}
+                        title="Совет Мастера"
+                        className="absolute -top-2 -right-2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-[#1A1D24] border border-white/10 text-blue-400 hover:text-blue-300 transition-colors shadow-lg cursor-pointer"
+                      >
+                        {isGeneratingTasks ? <Loader2 size={12} className="animate-spin" /> : <Eye size={14} />}
+                      </button>
+                    )}
+                    <div className="glass-card px-4 py-3 min-w-[130px] flex flex-col gap-2 shadow-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex flex-shrink-0 items-center justify-center border border-white/5 ${isPerfectDay ? 'bg-amber-400/10 text-amber-400' : 'bg-purple-500/10 text-purple-400'}`}>
+                          <Zap size={14} className={isPerfectDay ? 'drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]' : ''} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] text-slate-500 font-medium whitespace-nowrap">Прогресс дня</div>
+                          <div className="text-[13px] font-black text-white leading-tight mt-0.5 whitespace-nowrap">
+                            {availableDailyTasks.length > 0 ? `${completedDailyTasks.length}/${availableDailyTasks.length}` : '0/0'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-1.5 w-full bg-[#0B0E14] rounded-full overflow-hidden mt-0.5 border border-white/5">
+                        <div 
+                          className={`h-full transition-all duration-500 ease-out ${isPerfectDay ? 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.8)]' : 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]'}`} 
+                          style={{ width: `${availableDailyTasks.length > 0 ? (completedDailyTasks.length / availableDailyTasks.length) * 100 : 0}%` }} 
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
 
-              <form onSubmit={addTask} className="flex flex-col gap-3 glass-card p-4">
-                <input
-                  type="text"
-                  value={newTask}
-                  onChange={e => setNewTask(e.target.value)}
-                  placeholder="Добавить новую задачу..."
-                  className="w-full bg-[#0B0E14] border border-white/5 rounded-2xl px-4 py-3.5 text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-white/20 transition-all shadow-inner text-sm"
-                />
+              <form onSubmit={addTask} className="glass-card p-4 flex flex-col gap-4 shadow-lg border-white/10">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="submit"
+                    disabled={!newTask.trim()}
+                    className="w-12 h-12 rounded-full border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 hover:bg-purple-500/10 transition-colors disabled:opacity-30 disabled:border-slate-700 disabled:text-slate-500 cursor-pointer"
+                  >
+                    <Plus size={22} className={newTask.trim() ? "drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" : ""} />
+                  </button>
+                  <div className="flex-1 min-w-0 flex flex-col justify-center">
+                    <input
+                      type="text"
+                      value={newTask}
+                      onChange={e => setNewTask(e.target.value)}
+                      placeholder="Добавить новую задачу"
+                      className="w-full bg-transparent text-white placeholder:text-white font-bold text-[15px] focus:outline-none mb-0.5"
+                    />
+                    <div className="text-xs text-slate-500">Что хочешь сделать?</div>
+                  </div>
+                </div>
                 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-white/5">
                   <select 
                     value={newTaskType} 
                     onChange={e => setNewTaskType(e.target.value as TaskType)}
-                    className="bg-[#0B0E14] border border-white/5 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:ring-1 focus:ring-white/20"
+                    className="bg-[#0B0E14] border border-white/5 rounded-xl px-3 py-2 text-xs font-medium text-slate-300 focus:outline-none focus:ring-1 focus:ring-white/20"
                   >
                     <option value="daily">Ежедневная</option>
                     <option value="weekly">Еженедельная</option>
@@ -2348,7 +2373,7 @@ export default function App() {
                     <select
                       value={newTaskDay}
                       onChange={e => setNewTaskDay(parseInt(e.target.value))}
-                      className="bg-[#0B0E14] border border-white/5 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:ring-1 focus:ring-white/20"
+                      className="bg-[#0B0E14] border border-white/5 rounded-xl px-3 py-2 text-xs font-medium text-slate-300 focus:outline-none focus:ring-1 focus:ring-white/20"
                     >
                       <option value={1}>Понедельник</option>
                       <option value={2}>Вторник</option>
@@ -2361,85 +2386,37 @@ export default function App() {
                   )}
 
                   {newTaskType === 'recurring' && (
-                    <div className="flex items-center gap-2 bg-[#0B0E14] border border-white/5 rounded-xl px-3 py-2.5">
-                      <span className="text-xs text-slate-400">Каждые</span>
+                    <div className="flex items-center gap-1.5 bg-[#0B0E14] border border-white/5 rounded-xl px-3 py-2 text-xs text-slate-300">
+                      <span>Каждые</span>
                       <input
                         type="number"
                         min="2"
                         max="365"
                         value={newTaskRepeatInterval}
                         onChange={e => setNewTaskRepeatInterval(parseInt(e.target.value) || 2)}
-                        className="w-12 bg-transparent text-xs text-slate-300 focus:outline-none text-center"
+                        className="w-8 bg-transparent focus:outline-none text-center font-medium"
                       />
-                      <span className="text-xs text-slate-400">дн.</span>
+                      <span>дн.</span>
                     </div>
                   )}
-                </div>
 
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-2 px-2">
-                  {Object.entries(STATS).map(([key, data]) => {
-                    if (key === 'unknown' && !effectiveApiKey && !effectiveAiBaseUrl) return null;
-                    const Icon = data.icon;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setNewTaskStat(key as StatType)}
-                        className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-medium whitespace-nowrap transition-all shrink-0 ${
-                          newTaskStat === key 
-                            ? `${data.bg} border-transparent text-slate-900 shadow-md` 
-                            : 'border-white/5 text-slate-400 hover:bg-white/5'
-                        }`}
-                      >
-                        <Icon size={14} />
-                        {data.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <button
-                  type="submit"
-                  disabled={!newTask.trim()}
-                  className="w-full bg-amber-600 hover:bg-amber-500 disabled:bg-[#0B0E14] disabled:text-slate-600 disabled:border disabled:border-white/5 text-white py-3.5 rounded-2xl font-bold transition-all shadow-lg shadow-amber-900/20 disabled:shadow-none flex items-center justify-center gap-2 mt-1 active:scale-[0.98]"
-                >
-                  <Plus size={18} />
-                  Добавить квест
-                </button>
-              </form>
+                  <div className="flex-1" />
 
-              {(effectiveApiKey || effectiveAiBaseUrl) && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={askGMForTasks}
-                    disabled={isGeneratingTasks}
-                    className="flex-1 min-w-[140px] py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
-                  >
-                    {isGeneratingTasks ? <Loader2 size={18} className="animate-spin" /> : <Bot size={18} />}
-                    Сюжетные задачи
-                  </button>
-                  <button
-                    onClick={askMasterForAdvice}
-                    disabled={isGeneratingTasks}
-                    className="flex-1 min-w-[140px] py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
-                  >
-                    {isGeneratingTasks ? <Loader2 size={18} className="animate-spin" /> : <Eye size={18} />}
-                    Совет Мастера
-                  </button>
-                  {tasks.some(t => t.stat === 'unknown' && !t.completed) && (
+                  {(effectiveApiKey || effectiveAiBaseUrl) && tasks.some(t => t.stat === 'unknown' && !t.completed) && (
                     <button
+                      type="button"
                       onClick={handleAutoCategorizeTasks}
                       disabled={isCategorizingTasks}
-                      className="flex-1 min-w-[140px] py-3 bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 border border-slate-500/30 font-bold rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                      className="flex-shrink-0 flex items-center justify-center w-8 h-8 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded-full transition-colors cursor-pointer"
+                      title="Авто-категоризация задач (ИИ)"
                     >
-                      {isCategorizingTasks ? <Loader2 size={18} className="animate-spin" /> : <HelpCircle size={18} />}
-                      Авто-статы
+                      {isCategorizingTasks ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
                     </button>
                   )}
                 </div>
-              )}
+              </form>
 
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {(() => {
                   const visibleTasks = tasks.filter(t => !t.availableAt || t.availableAt <= Date.now());
                   const activeTasks = visibleTasks.filter(t => !t.completed);
@@ -2458,37 +2435,31 @@ export default function App() {
                         exit={{ opacity: 0, scale: 0.95 }}
                         key={task.id}
                         onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
-                        className={`group flex items-center gap-3 p-4 transition-all glass-card cursor-pointer ${
+                        className={`group flex items-center gap-3 p-4 transition-all glass-card cursor-pointer shadow-md ${
                           task.completed
-                            ? 'opacity-50'
-                            : 'hover:border-white/10 shadow-sm'
-                        } ${task.isMasterTask ? 'border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.1)] bg-amber-500/5' : ''}`}
+                            ? 'opacity-50 grayscale pt-3 pb-3'
+                            : 'hover:border-white/10'
+                        }`}
                       >
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
                           disabled={isEvaluating === task.id}
                           className={`flex-shrink-0 transition-colors ${
-                            task.completed ? 'text-emerald-500' : task.isMasterTask ? 'text-amber-500 hover:text-amber-400' : 'text-slate-500 hover:text-emerald-400'
+                            task.completed ? 'text-emerald-500' : 'text-slate-500 hover:text-emerald-400'
                           } disabled:opacity-50`}
                         >
                           {isEvaluating === task.id ? <Loader2 size={24} className="animate-spin text-amber-500" /> : task.completed ? <CheckCircle size={24} /> : <Circle size={24} />}
                         </button>
                         <div className="flex-1 flex flex-col gap-1 min-w-0">
-                          <span className={`transition-all break-words ${task.completed ? 'line-through opacity-70' : ''} ${task.isMasterTask ? 'text-amber-100/90' : ''}`}>
+                          <span className={`transition-all break-words text-[15px] font-bold ${task.completed ? 'line-through opacity-70 text-slate-400' : 'text-white'}`}>
                             {task.text}
                           </span>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                             {task.difficulty && expandedTaskId === task.id && (
-                              <div className="flex items-center gap-1 text-amber-400" title="Сложность (Огоньки)">
+                              <div className="flex items-center gap-0.5 text-amber-500" title="Сложность (Огоньки)">
                                 {Array.from({ length: task.difficulty }).map((_, i) => (
-                                  <Flame key={i} size={10} />
+                                  <Flame key={i} size={10} fill="currentColor" />
                                 ))}
-                              </div>
-                            )}
-                            {task.isMasterTask && (
-                              <div className="flex items-center gap-1 text-amber-500/80">
-                                <Book size={12} />
-                                <span>Сюжет</span>
                               </div>
                             )}
                             <div className="relative">
@@ -2532,6 +2503,14 @@ export default function App() {
                                 )}
                               </AnimatePresence>
                             </div>
+                            
+                            {!task.completed && (
+                              <span className="flex items-center gap-1 border border-white/10 px-1.5 py-0.5 rounded backdrop-blur-sm bg-white/5 text-slate-300">
+                                <span className={campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-slate-400'}>✧</span>
+                                +{(task.difficulty || 1) * 10} <span className="opacity-70 font-medium">опыта</span>
+                              </span>
+                            )}
+
                             {task.type && task.type !== 'one-off' && (
                               <span className="px-1.5 py-0.5 rounded bg-[#0B0E14]/80 border border-white/5 text-[10px] uppercase tracking-wider font-medium">
                                 {task.type === 'daily' ? 'Ежедневная' : 
@@ -2595,9 +2574,9 @@ export default function App() {
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                          className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-rose-400 transition-all p-2 rounded-lg hover:bg-rose-500/10"
+                          className="text-purple-500 border border-purple-500/20 hover:text-purple-300 hover:bg-purple-500/20 transition-all p-2.5 rounded-xl shadow-sm bg-purple-500/5 cursor-pointer ml-1"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={16} />
                         </button>
                       </motion.div>
                     );
@@ -2605,46 +2584,36 @@ export default function App() {
 
                   return (
                     <>
-                      <AnimatePresence mode="popLayout">
-                        {activeTasks.map(renderTask)}
-                        {pendingTasks.map(renderTask)}
-                      </AnimatePresence>
-                      
-                      {finishedTasks.length > 0 && (
-                        <div className="pt-4 mt-4 border-t border-white/5">
-                          <button
-                            onClick={() => setShowFinishedTasks(!showFinishedTasks)}
-                            className="flex items-center justify-between w-full p-2 text-sm text-slate-500 hover:text-slate-300 transition-colors"
-                          >
-                            <span className="font-medium">Завершенные ({finishedTasks.length})</span>
-                            {showFinishedTasks ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                          </button>
-                          
-                          <AnimatePresence>
-                            {showFinishedTasks && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="space-y-3 pt-3">
-                                  <AnimatePresence mode="popLayout">
-                                    {finishedTasks.map(renderTask)}
-                                  </AnimatePresence>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      )}
-
-                      {visibleTasks.length === 0 && (
+                      {activeTasks.length > 0 || pendingTasks.length > 0 ? (
+                        <>
+                          <h3 className="text-[17px] font-bold text-white mt-2 mb-1">Сегодня</h3>
+                          <div className="space-y-3">
+                            <AnimatePresence mode="popLayout">
+                              {activeTasks.map(renderTask)}
+                              {pendingTasks.map(renderTask)}
+                            </AnimatePresence>
+                          </div>
+                        </>
+                      ) : (
                         <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
                           <div className="opacity-20">
                             <Flame size={64} className="text-[#E0E0E0]" />
                           </div>
                           <p className="lore-text text-xl text-[#8A8D93]">Герой отдыхает. Добавьте задачу, чтобы продолжить путь.</p>
+                        </div>
+                      )}
+                      
+                      {finishedTasks.length > 0 && (
+                        <div className="pt-4 mt-6">
+                          <button
+                            onClick={clearCompleted}
+                            className="flex items-center justify-between w-full p-4 text-sm text-purple-300 hover:text-purple-200 bg-[#16122b]/80 transition-colors rounded-[16px] border border-purple-500/20 cursor-pointer shadow-lg"
+                          >
+                            <span className="font-bold flex items-center gap-2">
+                              <span className="text-lg">✨</span> Очистить выполненные
+                            </span>
+                            <ChevronRight size={16} />
+                          </button>
                         </div>
                       )}
                     </>
@@ -2654,27 +2623,16 @@ export default function App() {
             </div> {/* End of space-y-6 flex-1 */}
 
             {/* Sticky bottom actions */}
-            {(tasks.some(t => t.completed && !t.rewarded) || tasks.some(t => t.completed && t.rewarded && (t.type === 'one-off' || t.type === 'recurring'))) && (
+            {tasks.some(t => t.completed && !t.rewarded) && (
               <div className="sticky bottom-0 w-full pt-4 pb-2 bg-gradient-to-t from-[#0B0E14] via-[#0B0E14] to-[#0B0E14]/80 z-30 shadow-[0_-20px_20px_-10px_#0B0E14]">
-                {tasks.some(t => t.completed && !t.rewarded) && (
-                  <button
-                    onClick={confirmPendingTasks}
-                    disabled={isEvaluating === "batch"}
-                    className="w-full py-3 mb-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-sm font-medium rounded-2xl transition-colors border border-emerald-500/20 flex items-center justify-center gap-2"
-                  >
-                    {isEvaluating === "batch" ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                    Подтвердить выполнение ({tasks.filter(t => t.completed && !t.rewarded).length})
-                  </button>
-                )}
-
-                {tasks.some(t => t.completed && t.rewarded && (t.type === 'one-off' || t.type === 'recurring')) && (
-                  <button
-                    onClick={clearCompleted}
-                    className="w-full py-3 text-sm font-medium text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    Очистить выполненные
-                  </button>
-                )}
+                <button
+                  onClick={confirmPendingTasks}
+                  disabled={isEvaluating === "batch"}
+                  className="w-full py-3 mb-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-sm font-medium rounded-2xl transition-colors border border-emerald-500/20 flex items-center justify-center gap-2"
+                >
+                  {isEvaluating === "batch" ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                  Подтвердить выполнение ({tasks.filter(t => t.completed && !t.rewarded).length})
+                </button>
               </div>
             )}
           </div>
@@ -2691,23 +2649,30 @@ export default function App() {
                 <>
                   {/* Campaign Map (Compact) */}
                   {campaign ? (
-                    <div className="w-full">
-                      <div className="flex justify-between items-end mb-1.5 px-1">
-                        <h2 className={`text-base font-bold ${THEME_COLORS[campaign.colorTheme || 'slate'].text}`}>{campaign.theme}</h2>
-                        <div className="flex items-center gap-1.5 text-slate-400 glass-card px-2 py-0.5 !rounded-lg">
-                          <Clock size={10} className={THEME_COLORS[campaign.colorTheme || 'slate'].text} />
-                          <span className="font-mono text-[10px] font-medium">{timeLeft}</span>
+                    <div className="w-full mb-2">
+                      <div className="flex justify-between items-center mb-3 px-1">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1.5 rounded-[12px] bg-[#12141A] border-2 ${THEME_COLORS[campaign.colorTheme || 'slate'].border} ${THEME_COLORS[campaign.colorTheme || 'slate'].text} ${THEME_COLORS[campaign.colorTheme || 'slate'].dropShadow} shadow-lg relative overflow-hidden`}>
+                             <div className={`absolute inset-0 opacity-20 ${THEME_COLORS[campaign.colorTheme || 'slate'].bg}`} />
+                             <Skull size={18} className="relative z-10" />
+                          </div>
+                          <h2 className={`text-[16px] font-black tracking-wide ${THEME_COLORS[campaign.colorTheme || 'slate'].text} drop-shadow-md`}>{campaign.theme}</h2>
+                        </div>
+                        <div className={`flex items-center gap-1.5 glass-card px-2.5 py-1 !rounded-xl border border-white/5 text-slate-300 shadow-md`}>
+                          <Clock size={12} className={THEME_COLORS[campaign.colorTheme || 'slate'].text} />
+                          <span className="font-mono text-[10px] font-bold">{timeLeft}</span>
                         </div>
                       </div>
                       
-                      <div className={`relative w-full h-16 bg-[#0B0E14] rounded-xl border ${THEME_COLORS[campaign.colorTheme || 'slate'].border} overflow-hidden shadow-sm`}>
+                      <div className={`relative w-full h-[76px] bg-[#0B0E14] rounded-[20px] border border-white/10 ${THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent} overflow-hidden shadow-sm`}>
                         {campaign.mapUrl ? (
-                          <img src={campaign.mapUrl} alt="Campaign Map" className="absolute inset-0 w-full h-full object-cover opacity-40" referrerPolicy="no-referrer" />
+                          <img src={campaign.mapUrl} alt="Campaign Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity" referrerPolicy="no-referrer" />
                         ) : (
                           <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-700 via-slate-900 to-black" />
                         )}
+                        <div className={`absolute inset-0 bg-gradient-to-r from-[#0B0E14]/80 via-transparent to-[#0B0E14]/80`} />
                         
-                        <div className="absolute inset-0 flex items-center justify-around px-4">
+                        <div className="absolute inset-0 flex items-center justify-around px-5">
                           {campaign.enemies.map((enemy, idx) => {
                             const isCurrent = idx === campaign.currentEnemyIndex;
                             const isDefeated = idx < campaign.currentEnemyIndex;
@@ -2716,35 +2681,38 @@ export default function App() {
                               <div key={enemy.id} className="relative flex flex-col items-center">
                                 {/* Path line */}
                                 {idx < campaign.enemies.length - 1 && (
-                                  <div className={`absolute top-4 left-1/2 w-full h-0.5 -z-10 ${isDefeated ? 'bg-emerald-500/50' : 'bg-white/5'}`} style={{ width: 'calc(100% + 2rem)' }} />
+                                  <div className={`absolute top-4 left-1/2 w-full h-0.5 -z-10 ${isDefeated ? THEME_COLORS[campaign.colorTheme || 'slate'].bg : 'bg-white/10'}`} style={{ width: 'calc(100% + 2.5rem)', opacity: isDefeated ? 0.5 : 1 }} />
                                 )}
                                 
                                 <div 
                                   onClick={() => handleEnemyClick(enemy, idx)}
-                                  className={`w-8 h-8 rounded-full border-2 flex items-center justify-center bg-[#0B0E14] z-10 transition-all cursor-pointer hover:scale-110 ${
+                                  className={`w-[36px] h-[36px] rounded-full border-2 flex items-center justify-center bg-[#0B0E14] z-10 transition-all cursor-pointer ${
                                   isCurrent ? `border-transparent scale-110 ${THEME_COLORS[campaign.colorTheme || 'slate'].shadow}` : 
-                                  isDefeated ? 'border-emerald-500 opacity-50' : 'border-white/20 opacity-70'
+                                  isDefeated ? 'border-transparent opacity-80 backdrop-blur-sm' : 'border-white/10 opacity-70'
                                 }`}
                                   style={isCurrent ? { borderColor: 'currentColor', color: 'var(--tw-colors-amber-400)' } : {}}
                                 >
-                                  {/* We use a wrapper to apply the border color dynamically if needed, but tailwind classes are better. Let's just use the text color for border. */}
-                                  <div className={`absolute inset-0 rounded-full border-2 ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].border : 'border-transparent'}`} />
+                                  {isCurrent && <div className={`absolute inset-0 rounded-full border-[3px] ${THEME_COLORS[campaign.colorTheme || 'slate'].border} animate-pulse`} />}
+                                  {isDefeated && <div className={`absolute inset-0 rounded-full border-2 ${THEME_COLORS[campaign.colorTheme || 'slate'].border} opacity-50`} />}
                                   
-                                  {enemy.imageUrl && !(idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex) ? (
-                                    <img src={enemy.imageUrl} alt={enemy.name} className="w-full h-full rounded-full object-cover z-10" referrerPolicy="no-referrer" />
-                                  ) : enemy.avatarEmoji && !(idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex) ? (
-                                    <span className="text-lg z-10">{enemy.avatarEmoji}</span>
-                                  ) : (
-                                    <Skull size={14} className={`z-10 ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : isDefeated ? 'text-emerald-500' : 'text-slate-500'}`} />
-                                  )}
+                                  <div className="w-full h-full overflow-hidden rounded-full relative">
+                                    <div className="absolute inset-0 bg-[#0B0E14] opacity-50" />
+                                    {enemy.imageUrl && !(idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex) ? (
+                                      <img src={enemy.imageUrl} alt={enemy.name} className={`w-full h-full object-cover relative z-10 ${isDefeated ? 'grayscale' : ''}`} referrerPolicy="no-referrer" />
+                                    ) : enemy.avatarEmoji && !(idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex) ? (
+                                      <span className="text-lg z-10 relative">{enemy.avatarEmoji}</span>
+                                    ) : (
+                                      <Skull size={16} className={`relative z-10 ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : isDefeated ? 'text-slate-600' : 'text-slate-600'}`} />
+                                    )}
+                                  </div>
                                   
                                   {isDefeated && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full z-20">
-                                      <CheckCircle size={14} className="text-emerald-400" />
+                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#0B0E14] rounded-full flex items-center justify-center z-20 border border-white/10">
+                                      <CheckCircle size={10} className={THEME_COLORS[campaign.colorTheme || 'slate'].text} />
                                     </div>
                                   )}
                                 </div>
-                                <span className={`text-[8px] mt-1 font-bold w-[60px] text-center break-words leading-tight ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-slate-400'}`}>
+                                <span className={`text-[8.5px] mt-1 font-bold w-[70px] text-center break-words leading-tight ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-slate-500'}`}>
                                   {idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex ? '???' : enemy.name}
                                 </span>
                               </div>
@@ -2780,11 +2748,18 @@ export default function App() {
                       <div className="flex flex-col flex-1 gap-3 min-h-0 pb-1">
                         {/* Boss Info Card */}
                         <motion.div 
-                          className="w-full flex-1 relative flex items-center justify-center rounded-2xl overflow-hidden shadow-lg border border-white/5 bg-[#121216] min-h-[160px]"
+                          className={`w-full flex-1 relative flex flex-col rounded-[20px] overflow-hidden border-2 ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].border : 'border-white/5'} ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent : 'bg-[#1A1D24]/40'} shadow-[0_0_30px_rgba(0,0,0,0.5)] min-h-[300px]`}
                           animate={bossHit ? { x: [-5, 5, -5, 5, 0], y: [-2, 2, -2, 2, 0] } : {}}
                           transition={{ duration: 0.25 }}
                         >
-                          
+                          {/* Lore Button */}
+                          <button 
+                            onClick={() => setShowStoryModal(true)}
+                            className="absolute top-3 right-3 w-7 h-7 rounded-full glass-card flex items-center justify-center z-20 border border-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          >
+                            <span className="font-serif italic font-bold text-[14px]">i</span>
+                          </button>
+
                           {/* Boss Avatar */}
                           <motion.div
                             animate={boss.hp <= 0 ? {
@@ -2799,7 +2774,7 @@ export default function App() {
                               <motion.img 
                                 src={boss.imageUrl} 
                                 alt={boss.name} 
-                                className="w-full h-full object-cover" 
+                                className="w-full h-full object-cover opacity-80" 
                                 referrerPolicy="no-referrer"
                                 animate={bossHit ? {
                                   filter: ['brightness(1) contrast(1)', 'brightness(1.5) contrast(1.2)', 'brightness(1) contrast(1)'],
@@ -2810,13 +2785,13 @@ export default function App() {
                                 transition={bossHit ? { duration: 0.2 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }}
                               />
                             ) : boss.avatarEmoji ? (
-                              <span className="text-9xl drop-shadow-2xl">{boss.avatarEmoji}</span>
+                              <span className="text-8xl drop-shadow-2xl">{boss.avatarEmoji}</span>
                             ) : (
-                              <Skull size={96} className="text-slate-500" />
+                              <Skull size={80} className="text-slate-500" />
                             )}
                             
                             {/* Gradient Overlay for Text Readability */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14] via-[#0B0E14]/60 to-transparent pointer-events-none" />
+                            <div className={`absolute inset-0 bg-gradient-to-t ${campaign ? `from-[#0B0E14] via-[${THEME_COLORS[campaign.colorTheme || 'slate'].bg}]/10` : 'from-[#0B0E14] via-[#0B0E14]/40'} to-transparent pointer-events-none`} />
                             
                             {bossHit && (
                               <motion.div 
@@ -2832,78 +2807,75 @@ export default function App() {
                           </motion.div>
 
                           {/* Boss Details */}
-                          <div className="absolute bottom-0 left-0 right-0 p-3 space-y-1.5 z-20 text-center">
+                          <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2 z-20 text-center bg-gradient-to-t from-[#0B0E14] to-transparent pt-10">
                             <div>
-                              <h2 className="text-xl font-bold text-rose-400 break-words whitespace-normal leading-[1.2] flex items-center justify-center gap-2 drop-shadow-md">
+                              <h2 className="text-[22px] font-bold text-white break-words whitespace-normal leading-[1.2] flex items-center justify-center gap-2 drop-shadow-lg tracking-wide">
+                                <span className={campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-slate-500'}>✧</span>
                                 {boss.name}
+                                <span className={campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-slate-500'}>✧</span>
                                 {boss.isNemesis && (
-                                  <span className="text-[9px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded border border-rose-500/30 uppercase tracking-wider backdrop-blur-sm">
+                                  <span className="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-md border border-rose-500/30 uppercase tracking-wider backdrop-blur-sm ml-1">
                                     Немезида
                                   </span>
                                 )}
                               </h2>
                               <div className="flex items-center justify-center gap-2 text-[11px] mt-1.5 drop-shadow-md">
-                                <span className="text-white/80 font-medium">Ур. {boss.level || (player.level <= boss.multipliers[weaknessStat as StatType] ? player.level + 2 : boss.multipliers[weaknessStat as StatType]) || 1}</span>
-                                <span className={`text-[9px] bg-${STATS[weaknessStat].bg}/20 ${STATS[weaknessStat].color} px-1.5 py-0.5 rounded uppercase tracking-wider font-bold border border-current backdrop-blur-sm`}>
+                                <span className="text-slate-300 font-medium tracking-wide">Ур. {boss.level || (player.level <= boss.multipliers[weaknessStat as StatType] ? player.level + 2 : boss.multipliers[weaknessStat as StatType]) || 1}</span>
+                                <span className={`text-[10px] bg-transparent ${STATS[weaknessStat].color} px-1.5 py-0.5 rounded-md uppercase tracking-wider font-bold border border-current backdrop-blur-sm shadow-[0_0_8px_currentColor]`}>
                                   {STATS[weaknessStat].name}
                                 </span>
                               </div>
                             </div>
                             
                             {/* HP Bar */}
-                            <div className="space-y-1 w-full max-w-[240px] mx-auto pt-1.5 drop-shadow-md">
-                              <div className="flex justify-between text-[10px] font-bold px-1 mb-1">
-                                <span className="text-rose-400">HP</span>
-                                <span className="text-white/90 font-mono">{Math.ceil(Math.max(0, boss.hp))} / {boss.maxHp}</span>
+                            <div className="space-y-1 w-full max-w-[240px] mx-auto pt-1 drop-shadow-md">
+                              <div className="flex justify-between text-[11px] font-bold px-1 mb-1 tracking-wide">
+                                <span className="text-rose-400">❤ HP</span>
+                                <span className="text-white font-mono">{Math.ceil(Math.max(0, boss.hp))} / {boss.maxHp}</span>
                               </div>
-                              <div className="h-2 w-full bg-[#121216]/60 backdrop-blur-sm rounded-full overflow-hidden border border-white/20 shadow-inner relative flex">
+                              <div className="h-[8px] w-full bg-[#121216]/80 backdrop-blur-sm rounded-full overflow-hidden border border-white/10 shadow-inner relative flex">
                                 {boss.hp <= 0 && <div className="absolute inset-0 bg-emerald-500 flex items-center justify-center text-[8px] font-bold text-emerald-900 tracking-widest uppercase z-10">Повержен</div>}
                                 <motion.div
-                                  className="h-full bg-gradient-to-r from-rose-600 to-rose-400 relative"
+                                  className="h-full bg-gradient-to-r from-rose-500 to-fuchsia-500 relative"
                                   initial={{ width: `${(boss.hp / boss.maxHp) * 100}%` }}
                                   animate={{ width: `${(boss.hp / boss.maxHp) * 100}%` }}
                                   transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
                                 >
-                                  <div className="absolute right-0 top-0 bottom-0 w-2 bg-white opacity-50 blur-[2px]"></div>
+                                  <div className="absolute right-0 top-0 bottom-0 w-3 bg-white opacity-60 blur-[3px]"></div>
                                 </motion.div>
                               </div>
                             </div>
                           </div>
                         </motion.div>
 
-                        {/* Boss Description */}
-                        <div className="bg-[#0B0E14]/50 border border-white/5 rounded-xl p-2.5 text-[11px] text-[#8A8D93] italic lore-text leading-relaxed max-h-[80px] overflow-y-auto custom-scrollbar shrink-0">
-                          {boss.description}
-                        </div>
-
                         {/* Attack Section */}
-                        <div className="mt-auto pt-1 space-y-2 shrink-0">
+                        <div className={`mt-auto space-y-3 shrink-0 glass-card rounded-[16px] p-4 border-2 ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].border : 'border-white/5'} ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent : ''}`}>
                           <div className="flex items-center justify-between px-2">
-                            <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                              <Flame size={12} className="text-amber-500" />
+                            <span className="text-[13px] text-slate-400 flex items-center gap-2 font-medium tracking-wide">
+                              <Flame size={14} className={campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-amber-500'} />
                               Накоплено силы:
                             </span>
-                            <span className="text-amber-400 font-bold text-base">
+                            <span className="text-white font-black text-xl drop-shadow-md">
                               {(Object.values(player.pendingDamage) as number[]).reduce((a, b) => a + b, 0)}
                             </span>
                           </div>
                           
                           {boss.hp <= 0 ? (
-                            <div className="pt-1 mt-auto">
+                            <div className="pt-0.5 mt-auto">
                               <button
                                 onClick={handleBossDefeated}
                                 disabled={isGeneratingBoss}
-                                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#0B0E14] disabled:text-slate-600 disabled:border disabled:border-white/5 text-white font-bold rounded-xl shadow-[0_4px_15px_rgba(16,185,129,0.2)] disabled:shadow-none transition-all active:scale-95 flex items-center justify-center gap-2 text-xs"
+                                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#0B0E14] disabled:text-slate-600 disabled:border disabled:border-white/5 text-white font-bold rounded-[14px] shadow-[0_4px_15px_rgba(16,185,129,0.2)] disabled:shadow-none transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
                               >
                                 {isGeneratingBoss ? (
                                   <>
                                     <Loader2 size={16} className="animate-spin" />
-                                    Генерация следующего этапа...
+                                    Генерация...
                                   </>
                                 ) : (
                                   <>
                                     <Trophy size={16} />
-                                    Продолжить путь
+                                    Продолжить
                                   </>
                                 )}
                               </button>
@@ -2940,17 +2912,17 @@ export default function App() {
                         const boxShadow = totalPending > 0 ? `0 0 ${20 + glowIntensity * 30}px rgba(225,29,72,${0.2 + glowIntensity * 0.5})` : 'none';
 
                         return (
-                          <div className="pt-1 mt-auto">
+                          <div className="pt-1">
                             <button
                               onClick={handleAttack}
                               disabled={totalPending === 0}
                               style={{ ...gradientStyle, boxShadow }}
-                              className={`w-full py-2.5 ${totalPending === 0 ? 'bg-[#0B0E14] text-[#8A8D93] border border-white/5' : 'text-white animate-gradient-flow'} font-bold rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 relative overflow-hidden text-xs`}
+                              className={`w-full py-2.5 ${totalPending === 0 ? 'bg-[#12141A] text-[#8A8D93] border border-white/5 shadow-inner' : 'text-white border-2 border-white/20 animate-gradient-flow'} font-extrabold rounded-[14px] transition-all active:scale-95 flex items-center justify-center gap-2 relative overflow-hidden text-sm uppercase tracking-wider`}
                             >
                               {totalPending > 0 && (
-                                <div className="absolute inset-0 bg-white/20 opacity-0 hover:opacity-100 transition-opacity" />
+                                <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
                               )}
-                              <Sword size={14} className="relative z-10" />
+                              <Sword size={16} className="relative z-10" />
                               <span className="relative z-10">Нанести удар</span>
                             </button>
                           </div>
@@ -3095,103 +3067,11 @@ export default function App() {
                       </ResponsiveContainer>
                     </div>
                   </div>
-
-                  <div className="mt-6 text-left">
-                    <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                      <Eye size={16} className="text-blue-400" />
-                      Глаз Мастера
-                    </h3>
-                    <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
-                      <p className="text-sm text-blue-100/90 leading-relaxed italic">
-                        "{gameState.chronicle.master_summary}"
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {gameState.chronicle.behavior_analytics.favorite_stat !== 'unknown' && (
-                          <span className="text-[10px] px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            Любимый стат: {STATS[gameState.chronicle.behavior_analytics.favorite_stat].name}
-                          </span>
-                        )}
-                        {gameState.chronicle.behavior_analytics.weakest_stat !== 'unknown' && (
-                          <span className="text-[10px] px-2 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                            Слабый стат: {STATS[gameState.chronicle.behavior_analytics.weakest_stat].name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6 text-left">
-                    <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                      <Trophy size={16} className="text-amber-400" />
-                      Достижения
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1 ${player.achievements?.includes('level_10') ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' : 'bg-[#0B0E14] border-white/5 text-slate-600'}`}>
-                        <span className="text-2xl">🌟</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Уровень 10</span>
-                      </div>
-                      <div className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1 ${player.achievements?.includes('combo_7') ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-[#0B0E14] border-white/5 text-slate-600'}`}>
-                        <span className="text-2xl">🔥</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Неделя комбо</span>
-                      </div>
-                      <div className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1 ${player.achievements?.includes('gold_1000') ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' : 'bg-[#0B0E14] border-white/5 text-slate-600'}`}>
-                        <span className="text-2xl">💰</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">1000 Золота</span>
-                      </div>
-                      <div className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1 ${player.achievements?.includes('first_boss') ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' : 'bg-[#0B0E14] border-white/5 text-slate-600'}`}>
-                        <span className="text-2xl">⚔️</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Первый босс</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 space-y-3">
-                    <button
-                      onClick={() => {
-                        if (deferredPrompt) {
-                          handleInstallApp();
-                        } else {
-                          setShowInstallModal(true);
-                        }
-                      }}
-                      className="w-full py-3 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
-                    >
-                      <Download size={18} />
-                      Установить приложение
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if ('serviceWorker' in navigator) {
-                          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                            for(let registration of registrations) {
-                              registration.unregister();
-                            }
-                          });
-                        }
-                        window.location.reload();
-                      }}
-                      className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition-colors border border-white/5 flex items-center justify-center gap-2"
-                    >
-                      <RefreshCw size={18} />
-                      Сбросить кэш и обновить
-                    </button>
-                  </div>
                 </div>
               </div>
 
               <div className="space-y-4">
-                <div className="glass-card p-5">
-                  <h3 className="text-sm font-bold text-amber-400 mb-2 flex items-center gap-2 lore-text">
-                    <Book size={16} />
-                    Летопись героя
-                  </h3>
-                  <p className="text-sm text-slate-300 leading-relaxed italic lore-text">
-                    {gameState.currentStory}
-                  </p>
-                </div>
-
-                <h3 className="text-lg font-bold text-slate-200 px-2 mt-6">Характеристики</h3>
+                <h3 className="text-lg font-bold text-slate-200 px-2 mt-2">Характеристики</h3>
                 <div className="grid gap-3">
                   {Object.entries(STATS).map(([key, data]) => {
                     if (key === 'unknown') return null;
