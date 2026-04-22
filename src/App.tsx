@@ -2282,7 +2282,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* Content */}
-        <main className={`flex-1 scrollbar-hide p-4 overflow-y-auto pb-24 ${activeTab === 'boss' ? 'flex flex-col' : ''}`}>
+        <main className={`flex-1 scrollbar-hide p-4 overflow-y-auto ${activeTab === 'boss' ? 'flex flex-col' : ''}`}>
           {activeTab === 'quests' && (
             <div className="flex flex-col min-h-full">
               <div className="space-y-6 flex-1">
@@ -3229,7 +3229,7 @@ export default function App() {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#0B0E14]/90 backdrop-blur-lg border-t border-white/5 pb-safe z-50">
+        <nav className="shrink-0 w-full bg-[#0B0E14]/90 backdrop-blur-lg border-t border-white/5 pb-safe z-50">
           <div className="flex justify-around items-center h-16 px-2">
             <button
               onClick={() => setActiveTab('quests')}
