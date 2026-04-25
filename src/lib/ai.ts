@@ -453,7 +453,20 @@ export const evaluateTaskWithAI = async (apiKey: string, baseUrl: string, model:
   }
 };
 
-export const generateAICampaign = async (apiKey: string, baseUrl: string, model: string, playerStats: Player['stats'], defeatedBosses: string[], currentStory: string, playerLevel: number, dailyPointsHistory: Record<string, number> = {}, inventory: import('../App').Trophy[] = [], nemesisBoss?: Boss, chronicle?: import('../App').HeroChronicle, isReroll: boolean = false): Promise<{ campaign: import('../App').Campaign, newStoryContext: string }> => {
+export const generateAICampaign = async (
+  apiKey: string, 
+  baseUrl: string, 
+  model: string, 
+  playerStats: Player['stats'], 
+  defeatedBosses: string[], 
+  currentStory: string, 
+  playerLevel: number, 
+  dailyPointsHistory: Record<string, number> = {}, 
+  inventory: import('../App').Trophy[] = [], 
+  nemesisBoss?: Boss, 
+  chronicle?: import('../App').HeroChronicle, 
+  isReroll: boolean = false
+): Promise<{ campaign: import('../App').Campaign, masterTask?: any, newStoryContext: string, newSeasonInfo?: import('../App').HeroChronicle['season_info'] }> => {
   try {
     const openai = getOpenAIClient(apiKey, baseUrl);
     let nemesisPrompt = "";
@@ -474,13 +487,42 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
     CRITICAL INSTRUCTION: Make the main boss a counter-measure against the player based on this chronicle. If they ignore certain tasks or have a weak stat, the boss should exploit this (e.g. resistance to their favorite stat, vulnerability to their weakest stat to force them to use it). The boss description should subtly mock or reference their recent behavior or ignored tasks.
     ` : '';
 
+    const isNewSeason = !chronicle?.season_info || isReroll;
+    let seasonContext = "";
+    if (isNewSeason) {
+      seasonContext = `
+      CRITICAL: You are generating the FIRST campaign of a NEW Season (Story Arc).
+      A Season lasts between 2 and 4 campaigns (weeks).
+      You MUST generate a global season setting/biome.
+      Also generate 5 NPCs for the city/camp, adapted to the dark fantasy lore of this season:
+      1. shop (Black market trader)
+      2. fortune (A diviner, blind seer, or oracle)
+      3. altar (A demonic or ancient shrine avatar)
+      4. beast (A beastmaster or familiar breeder)
+      5. expedition (Guild master or scout leader)
+      For each NPC, provide a very specific \`imagePrompt\` that MUST start with: "High quality vertical portrait of a [type] looking directly at the viewer, dark fantasy game art, detailed atmospheric lighting. Minimal background. NO UI, NO TEXT."
+      Return "season_info" in your JSON response with the new season's name, lore, total campaigns (2 to 4), and set current_campaign to 1. Ensure you include the 'npcs' object.
+      `;
+    } else if (chronicle?.season_info) {
+      const nextIndex = chronicle.season_info.current_campaign + 1;
+      const isFinale = nextIndex === chronicle.season_info.total_campaigns;
+      seasonContext = `
+      CRITICAL: You are generating campaign ${nextIndex} out of ${chronicle.season_info.total_campaigns} in the current Season "${chronicle.season_info.name}".
+      Season Lore: ${chronicle.season_info.setting_lore}
+      Keep the theme strictly within this Season!
+      ${isFinale ? "THIS IS THE SEASON FINALE. The main boss MUST be the epic 'Главарь' (Boss of the Season) and the story should conclude the arc." : "This is a continuation of the season."}
+      Return "season_info" in your JSON response to reflect the updated current_campaign index (${nextIndex}).
+      `;
+    }
+
     const systemPrompt = `You are a Game Master in an RPG habit tracker.
     Create a weekly campaign. The player will face 2-3 mini-bosses (minions) over the week, leading up to a main boss.
+    ${seasonContext}
     ${nemesisPrompt}
     ${chronicleContext}
     For each enemy, assign exactly ONE vulnerability (multiplier 1.5) and optionally ONE resistance (multiplier 0.5) to their stats (strength, intelligence, charisma, willpower). The rest should be 1.0.
     Also generate a small trophy/relic that drops from each boss. The effect should be microscopic to not break game balance (e.g., +1% XP to Willpower, +1.5% damage to weaknesses, -1% to future boss HP).
-    For each boss, provide a single emoji that best represents them (e.g., 🐺 for a wolf, 🧛‍♂️ for a vampire, 👁️ for an eye monster).
+    For each boss, provide a single emoji that best represents them.
     For each boss, provide a 'banter' object with 4 short phrases (one for each stat: strength, intelligence, charisma, willpower). The boss will say this phrase when hit by that stat.
     Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
@@ -488,6 +530,25 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
       "colorTheme": "slate" | "emerald" | "rose" | "amber" | "blue" | "purple" | "cyan",
       "mapPrompt": "A short English prompt for an AI image generator to create a top-down fantasy map for this campaign. Not photorealistic, stylized.",
       "newStoryContext": "Updated brief storyline summary in Russian including this new threat.",
+      "masterTask": {
+        "text": "Name of the weekly story-related real-life task for the player (e.g., 'Сходить в поход на выходных', 'Прочитать книгу о драконах'). MUST be realistic, not fantasy roleplay.",
+        "stat": "strength",
+        "difficulty": 4
+      },
+      "season_info": {
+        "name": "Season Name",
+        "setting_lore": "Global season lore summary",
+        "total_campaigns": 3,
+        "current_campaign": 1,
+        "city_background_prompt": "A short English prompt for an AI image generator to create a top-down dark fantasy settlement/camp map for this season. Stylized concept art, high detail, no UI, no text.",
+        "npcs": {
+          "shop": { "name": "Shadow Broker", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "fortune": { "name": "Blind Seer", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "altar": { "name": "Blood Altar", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "beast": { "name": "Beastmaster", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "expedition": { "name": "Guild Master", "quote": "Quote...", "imagePrompt": "Portrait of..." }
+        }
+      },
       "enemies": [
         {
           "name": "Mini-boss Name (in Russian)",
@@ -589,7 +650,7 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
       const expirationDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd, 23, 59, 59, 999);
 
       return {
-        id: Date.now().toString() + Math.random(),
+        id: crypto.randomUUID(),
         level: playerLevel,
         name: e.name || (isMiniBoss ? "Приспешник" : "Неизвестный Босс"),
         description: e.description || "...",
@@ -602,7 +663,7 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
         defeated: false,
         isNemesis: !isMiniBoss && !!nemesisBoss,
         dropTrophy: e.dropTrophy ? {
-          id: Date.now().toString() + Math.random(),
+          id: crypto.randomUUID(),
           ...e.dropTrophy
         } : undefined
       };
@@ -612,7 +673,7 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
 
     return {
       campaign: {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         theme: data.theme || "Новая угроза",
         colorTheme: data.colorTheme || "slate",
         mapPrompt: data.mapPrompt || "",
@@ -620,12 +681,42 @@ export const generateAICampaign = async (apiKey: string, baseUrl: string, model:
         currentEnemyIndex: 0,
         deadline: Date.now() + 7 * 24 * 60 * 60 * 1000
       },
-      newStoryContext: data.newStoryContext || currentStory
+      masterTask: data.masterTask,
+      newStoryContext: data.newStoryContext || currentStory,
+      newSeasonInfo: data.season_info
     };
   } catch (error: any) {
     console.error("[AI Campaign] Fatal error during campaign generation:", error);
     throw new Error(error?.message || "Неизвестная ошибка при генерации кампании");
   }
+};
+
+const compressImage = async (base64Str: string, maxWidth = 512): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > maxWidth) {
+        height = Math.round(height * (maxWidth / width));
+        width = maxWidth;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      } else {
+        resolve(base64Str);
+      }
+    };
+    img.onerror = () => resolve(base64Str);
+    img.src = base64Str;
+  });
 };
 
 export const generateAIImage = async (apiKey: string, baseUrl: string, model: string, prompt: string, enabled: boolean = true, aspectRatio: string = "1:1") => {
@@ -661,8 +752,16 @@ export const generateAIImage = async (apiKey: string, baseUrl: string, model: st
 
     const data = response.data[0];
     if (data.b64_json) {
-      console.log("[AI Image] Successfully generated image (base64)");
-      return `data:image/png;base64,${data.b64_json}`;
+      console.log("[AI Image] Successfully generated image (base64). Compressing...");
+      const fullBase64 = `data:image/png;base64,${data.b64_json}`;
+      try {
+        const compressed = await compressImage(fullBase64);
+        console.log(`[AI Image] Compressed base64 size: ${Math.round(compressed.length / 1024)}KB`);
+        return compressed;
+      } catch (e) {
+        console.error("[AI Image] Compression failed, returning original base64", e);
+        return fullBase64;
+      }
     }
     if (data.url) {
       console.log("[AI Image] Successfully generated image (url)");
@@ -730,7 +829,7 @@ export const generateAITrophy = async (
     }
     
     return {
-      id: Date.now().toString() + Math.random(),
+      id: crypto.randomUUID(),
       name: data.name || "Неизвестный трофей",
       description: data.description || "...",
       imagePrompt: data.imagePrompt,
@@ -742,7 +841,7 @@ export const generateAITrophy = async (
     console.error("[AI Trophy] Fatal error during trophy generation:", error);
     // Fallback trophy
     return {
-      id: Date.now().toString() + Math.random(),
+      id: crypto.randomUUID(),
       name: `Осколок: ${bossName}`,
       description: "Слабое воспоминание о победе.",
       icon: "✨",
@@ -786,7 +885,7 @@ export const generateShopItems = async (apiKey: string, baseUrl: string, model: 
     if (!content) throw new Error("Пустой ответ от OpenAI");
 
     const data = extractJSON(content);
-    return data.items;
+    return data.items.map((item: any) => ({ ...item, id: crypto.randomUUID() }));
   } catch (error) {
     console.error("[AI Shop] Error generating shop items:", error);
     return [];
@@ -864,98 +963,39 @@ export const generateRandomEncounter = async (apiKey: string, baseUrl: string, m
   }
 };
 
-export const generateTasks = async (
-  apiKey: string, 
-  baseUrl: string, 
-  model: string, 
-  playerStats: any, 
-  boss: any, 
-  existingTasks: string[], 
-  allBosses: any[],
-  chronicle?: any
-) => {
+export const evaluateOathWithAI = async (apiKey: string, baseUrl: string, model: string, oathText: string): Promise<any> => {
   try {
     const openai = getOpenAIClient(apiKey, baseUrl);
-    
-    // Формируем контекст кампании
-    const campaignContext = allBosses.map((b, index) => {
-      if (index === allBosses.length - 1) {
-        return `Финальный босс (ИМЯ СКРЫТО ОТ ИГРОКА, используй только намеки): Неведомая угроза, ${b.description}`;
-      }
-      return `Босс ${index + 1}: ${b.name} - ${b.description}`;
-    }).join('\n');
 
-    const chronicleContext = chronicle ? `
-    Player Chronicle (Memory):
-    Favorite Stat: ${chronicle.behavior_analytics.favorite_stat}
-    Weakest Stat: ${chronicle.behavior_analytics.weakest_stat}
-    Ignored Patterns: ${chronicle.behavior_analytics.ignored_tasks_patterns.join(', ')}
-    Recent Memory: ${chronicle.recent_memory_log.join(' | ')}
-    
-    CRITICAL INSTRUCTION: Tailor the tasks to challenge the player's weaknesses (Weakest Stat, Ignored Patterns) while utilizing their strengths. Reference their recent memory subtly if applicable.
-    ` : '';
+    const systemPrompt = `You are a strict, hardcore Gatekeeper of the Altar of Oaths in a dark fantasy gamified productivity app.
+    The user submits a task they pledge to complete within 1 week.
 
-    const systemPrompt = `You are a Game Master. The player needs new quests for their current campaign.
-    Generate exactly 3 ONE-OFF tasks. These tasks should form a cohesive narrative arc preparing the player for the entire campaign, not just the current boss.
-    
-    Campaign Context:
-    ${campaignContext}
-    ${chronicleContext}
-    
-    CRITICAL RULES:
-    1. Distribute the 3 tasks logically: some for immediate preparation (current boss), some for mid-campaign, and 1-2 hinting at the final boss.
-    2. NEVER use the name of the final boss. Use ominous hints, foreshadowing, and abstract threats (e.g., "prepare for the gathering shadow", "decipher the ancient warnings").
-    3. NO DUPLICATES: The tasks MUST NOT duplicate or closely repeat any existing tasks in the user's quest log shown below (e.g. if they have 'Do 10 pushups', do not add 'Do 20 pushups').
-    4. ACTIONABLE & REAL-LIFE: Tasks MUST be actionable, general real-life tasks (fitness, learning, chores). Do NOT give literal fantasy tasks like 'Chop wood' or 'Find a magic herb'.
-    5. LOGICAL CONNECTION: The task description must weave the RPG story but the required real-life action must make logical sense in that context. FORMAT YOUR TASK TEXT LIKE THIS: "[Story fluff]. [Clear real life action]". Example 1: "Древние руны указывают путь к логову мага. Прочитай 10 страниц любой книги." Example 2: "Чтобы увернуться от клыков монстра, нужна ловкость. Сделай 20 приседаний."
-    6. TARGET WEAKNESSES: The tasks MUST be tailored to the weakest stats listed above to force the user to improve in those areas.
-    7. Categorize each task into one of these 4 stats:
-       - strength (Сила/Тело: спорт, питание, сон, прогулки)
-       - intelligence (Интеллект/Разум: чтение, обучение, работа, программирование)
-       - charisma (Харизма/Дух/Социум: общение, соцсети, помощь)
-       - willpower (Воля/Дисциплина: рутина, уборка, неприятные дела)
-    8. EVALUATE DIFFICULTY: Rate each task's difficulty from 1 to 5 (1=Trivial, 2=Easy, 3=Medium, 4=Hard, 5=Exhausting).
-    9. Add an "isMasterTask": true flag to all 3 tasks to visually distinguish them as story quests.
-    
-    Return ONLY a valid JSON object containing an array under the key "tasks", no markdown formatting:
+    Read their oath: "${oathText}"
+
+    If this is a minor routine (cleaning room, going to the store, normal homework), REJECT it with superiority.
+    If it is a truly difficult or large project (exam prep, finishing a project, running a marathon), ACCEPT it and offer a generous reward in gold (200-1000) or XP (100-500).
+
+    Return ONLY a valid JSON object:
     {
-      "tasks": [
-        { 
-          "text": "Task description in Russian", 
-          "stat": "strength" | "intelligence" | "charisma" | "willpower",
-          "difficulty": 1 | 2 | 3 | 4 | 5,
-          "isMasterTask": true
-        }
-      ]
+      "accepted": boolean,
+      "gatekeeperMessage": "In character response (Russian). If rejecting, insult their weak ambition. If accepting, sound impressed and ominous.",
+      "rewardType": "gold" | "xp" | "none",
+      "rewardValue": number (0 if rejected)
     }`;
 
-    const userPrompt = `Player stats: ${JSON.stringify(playerStats)}
-    Current Boss: ${boss.name}
-    Existing tasks: ${existingTasks.length > 0 ? existingTasks.join(', ') : 'None'}`;
-
-    console.log("[AI Tasks] Requesting task generation...");
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
+      messages: [{ role: 'system', content: systemPrompt }],
       response_format: { type: 'json_object' }
     });
 
     const content = response.choices?.[0]?.message?.content;
-    if (!content) throw new Error("Пустой ответ от OpenAI");
+    if (!content) throw new Error("Empty response from AI");
 
-    const data = extractJSON(content);
-
-    if (!data.tasks || !Array.isArray(data.tasks)) {
-      throw new Error("ИИ не вернул список задач");
-    }
-
-    console.log("[AI Tasks] Successfully generated tasks:", data.tasks.length);
-    return data.tasks;
-  } catch (error: any) {
-    console.error("[AI Tasks] Fatal error during task generation:", error);
-    throw new Error(error?.message || "Неизвестная ошибка при генерации заданий");
+    return extractJSON(content);
+  } catch (error) {
+    console.error("[AI Oath] Error:", error);
+    return null;
   }
 };
+

@@ -4,10 +4,11 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sword, CheckCircle, Circle, Plus, Trash2, Trophy, Skull, User, Flame, Target, Shield, Book, Heart, Zap, Clock, AlertCircle, Settings, Bot, X, Loader2, RefreshCw, AlertTriangle, Download, HelpCircle, ChevronUp, ChevronDown, ChevronRight, Eye, ShoppingBag, Coins } from 'lucide-react';
+import { Sword, CheckCircle, Circle, Plus, Trash2, Trophy, Skull, User, Flame, Target, Shield, Book, Heart, Zap, Clock, AlertCircle, Settings, Bot, X, Loader2, RefreshCw, AlertTriangle, Download, HelpCircle, ChevronUp, ChevronDown, ChevronRight, Eye, ShoppingBag, Coins, Map, Store, Tent, Dna, Compass, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateTasks, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics } from './lib/ai';
+import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics } from './lib/ai';
+import { NPCModal } from './components/NPCModal';
 
 export type StatType = 'strength' | 'intelligence' | 'charisma' | 'willpower' | 'unknown';
 
@@ -130,6 +131,21 @@ export type Trophy = {
 };
 
 export type HeroChronicle = {
+  season_info?: {
+    name: string;
+    setting_lore: string;
+    total_campaigns: number;
+    current_campaign: number;
+    city_background_url?: string;
+    city_background_prompt?: string;
+    npcs?: {
+      shop?: { name: string, quote: string, imagePrompt: string, imageUrl?: string };
+      fortune?: { name: string, quote: string, imagePrompt: string, imageUrl?: string };
+      altar?: { name: string, quote: string, imagePrompt: string, imageUrl?: string };
+      beast?: { name: string, quote: string, imagePrompt: string, imageUrl?: string };
+      expedition?: { name: string, quote: string, imagePrompt: string, imageUrl?: string };
+    };
+  };
   behavior_analytics: {
     favorite_stat: StatType | 'unknown';
     weakest_stat: StatType | 'unknown';
@@ -150,8 +166,10 @@ export type HeroChronicle = {
 export type Familiar = {
   name: string;
   type: string;
+  rarity?: 'common' | 'rare' | 'epic' | 'legendary';
   stage: 'egg' | 'baby' | 'evolved' | 'ultra';
-  buffActive: boolean;
+  status: 'active' | 'injured';
+  injuredUntil?: number;
   imageUrl?: string;
   xp: number;
   level: number;
@@ -242,7 +260,7 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
     const expirationDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 6, 23, 59, 59, 999);
     return {
       ...nemesis,
-      id: Date.now().toString() + Math.random(),
+      id: crypto.randomUUID(),
       level: playerLevel,
       name: `Мстительный ${nemesis.name}`,
       hp: Math.floor(nemesis.maxHp * 1.5),
@@ -301,7 +319,7 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
   const expirationDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd, 23, 59, 59, 999);
 
   return {
-    id: Date.now().toString() + Math.random(),
+    id: crypto.randomUUID(),
     level: playerLevel,
     name: isMiniBoss ? `Приспешник: ${bossData.name}` : bossData.name,
     description: bossData.description,
@@ -313,7 +331,7 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
     isMiniBoss,
     defeated: false,
     dropTrophy: {
-      id: Date.now().toString() + Math.random(),
+      id: crypto.randomUUID(),
       name: `Осколок ${bossData.name}`,
       description: `Частица силы поверженного врага.`,
       icon: "✨",
@@ -333,7 +351,7 @@ const getTotalStatXp = (level: number, currentXp: number) => {
 };
 
 const getFamiliarBuff = (combo: number, familiar?: Familiar) => {
-  if (!familiar || !familiar.buffActive || familiar.stage === 'egg') return 0;
+  if (!familiar || familiar.status !== 'active' || familiar.stage === 'egg') return 0;
   // Base buff based on stage + small bonus per level
   let baseBuff = 0;
   if (familiar.stage === 'baby') baseBuff = 0.01;
@@ -375,6 +393,9 @@ export default function App() {
       const saved = localStorage.getItem('questlog_player_v4');
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (parsed.inventory && Array.isArray(parsed.inventory)) {
+          parsed.inventory = parsed.inventory.filter((item: any, index: number, self: any[]) => index === self.findIndex((t) => t.id === item.id));
+        }
         return { 
           ...defaultPlayer, 
           ...parsed, 
@@ -419,18 +440,22 @@ export default function App() {
     return defaultPlayer;
   });
 
+const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Math.random().toString(36).substring(2) + Date.now().toString(36));
+
   const [tasks, setTasks] = useState<Task[]>(() => {
     try {
       const saved = localStorage.getItem('questlog_tasks_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return Array.isArray(parsed) ? parsed : [];
+        const deduplicate = (arr: any[]) => arr.filter((item, index, self) => index === self.findIndex((t) => (t.id || '') === (item.id || '')));
+        return Array.isArray(parsed) ? deduplicate(parsed).map(t => ({...t, id: t.id || uuid()})) : [];
       }
       
       const oldSaved = localStorage.getItem('questlog_tasks');
       if (oldSaved) {
         const old = JSON.parse(oldSaved);
-        return Array.isArray(old) ? old.map((t: any) => ({ ...t, stat: t.stat || 'strength' })) : [];
+        const deduplicate = (arr: any[]) => arr.filter((item, index, self) => index === self.findIndex((t) => (t.id || '') === (item.id || '')));
+        return Array.isArray(old) ? deduplicate(old).map((t: any) => ({ ...t, id: t.id || uuid(), stat: t.stat || 'strength' })) : [];
       }
     } catch (e) {
       console.error("Failed to parse tasks data", e);
@@ -466,7 +491,7 @@ export default function App() {
     return generateBoss(player.level, player.dailyPointsHistory, player.inventory);
   });
 
-  const [activeTab, setActiveTab] = useState<'quests' | 'boss' | 'profile' | 'shop'>('quests');
+  const [activeTab, setActiveTab] = useState<'quests' | 'boss' | 'profile' | 'city'>('quests');
   const [newTask, setNewTask] = useState('');
   const [newTaskStat, setNewTaskStat] = useState<StatType>('unknown');
   const [newTaskType, setNewTaskType] = useState<TaskType>('daily');
@@ -485,6 +510,18 @@ export default function App() {
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [bossFailed, setBossFailed] = useState(false);
   const [midnightEchoReport, setMidnightEchoReport] = useState<{ missedTasks: number; damageTaken: number; comboReset: boolean } | null>(null);
+  
+  // City Node States
+  const [showShopNode, setShowShopNode] = useState(false);
+  const [showFortuneTellerNode, setShowFortuneTellerNode] = useState(false);
+  const [showAltarNode, setShowAltarNode] = useState(false);
+  const [showBeastNode, setShowBeastNode] = useState(false);
+  const [showExpeditionNode, setShowExpeditionNode] = useState(false);
+  const [oathInput, setOathInput] = useState('');
+  const [isEvaluatingOath, setIsEvaluatingOath] = useState(false);
+
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStep, setGenerationStep] = useState('');
 
   const [aiSettings, setAiSettings] = useState<AISettings>(() => {
     try {
@@ -495,6 +532,14 @@ export default function App() {
       return { apiKey: '', baseUrl: '', model: 'gpt-4o-mini', imageModel: 'dall-e-3', developerMode: false, enableImages: true, useGeminiMode: false, geminiApiKey: '' };
     }
   });
+
+  const safeStorageSet = (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.error(`Failed to save to localStorage for key ${key}`, e);
+    }
+  };
 
   const effectiveApiKey = aiSettings.useGeminiMode ? (aiSettings.geminiApiKey || '') : (aiSettings.apiKey || '');
   const effectiveAiBaseUrl = aiSettings.useGeminiMode ? "https://generativelanguage.googleapis.com/v1beta/openai/" : (aiSettings.baseUrl || '');
@@ -508,6 +553,8 @@ export default function App() {
       nemesisBoss: null as Boss | null,
       shopItems: [] as ShopItem[],
       lastWeeklyReset: Date.now(),
+      events: [] as Array<{ id: string, zoneIndex: number, description: string, rewardGold: number, taskPrompt?: string }>,
+      altarTask: null as null | { id: string, description: string, rewardType: string, rewardValue: any, deadline: number, status: 'active' | 'completed' | 'failed' },
       chronicle: {
         behavior_analytics: {
           favorite_stat: 'unknown' as StatType | 'unknown',
@@ -534,6 +581,13 @@ export default function App() {
         if (!parsed.chronicle) {
           parsed.chronicle = defaultState.chronicle;
         }
+        if (parsed.events && Array.isArray(parsed.events)) {
+          parsed.events = parsed.events.filter((item: any, index: number, self: any[]) => index === self.findIndex((t) => t.id === item.id));
+        }
+        if (parsed.shopItems && Array.isArray(parsed.shopItems)) {
+          // Shop items occasionally missing id if from legacy pool
+          parsed.shopItems = parsed.shopItems.map((item: any) => ({ ...item, id: item.id || crypto.randomUUID() }));
+        }
         return { ...defaultState, ...parsed };
       }
       return defaultState;
@@ -551,6 +605,7 @@ export default function App() {
   const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
   const [isCategorizingTasks, setIsCategorizingTasks] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [activeEvent, setActiveEvent] = useState<any>(null);
   const [showStoryModal, setShowStoryModal] = useState(false);
   const [selectedTrophy, setSelectedTrophy] = useState<Trophy | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -575,11 +630,38 @@ export default function App() {
   };
 
   useEffect(() => {
-    localStorage.setItem('questlog_ai_settings', JSON.stringify(aiSettings));
+    // Check if familiar injured time is up
+    if (player.familiar?.status === 'injured' && player.familiar.injuredUntil && player.familiar.injuredUntil <= Date.now()) {
+      setPlayer(prev => prev.familiar ? { ...prev, familiar: { ...prev.familiar, status: 'active', injuredUntil: undefined } } : prev);
+    }
+
+    // Check if altar oath failed
+    if (gameState.altarTask?.status === 'active' && gameState.altarTask.deadline <= Date.now()) {
+      const penaltyRoll = Math.floor(Math.random() * 3);
+      if (penaltyRoll === 0) {
+        // Pet permadeath
+        setPlayer(prev => ({ ...prev, familiar: undefined }));
+        setGmMessage("Клятва нарушена! Алтарь забрал жизнь твоего питомца в уплату долга.");
+      } else if (penaltyRoll === 1) {
+        // Lose levels
+        setPlayer(prev => ({ ...prev, level: Math.max(1, prev.level - 2), xp: 0 }));
+        setGmMessage("Клятва нарушена! Алтарь вытянул твой опыт. Ты теряешь уровни.");
+      } else {
+        // Normally ban from city... Let's just steal a lot of gold for simplicity without complex "banned" state.
+        setPlayer(prev => ({ ...prev, gold: Math.max(0, prev.gold - 500) }));
+        setGmMessage("Клятва нарушена! Алтарь наложил проклятие разорения.");
+      }
+      setGameState(prev => ({ ...prev, altarTask: { ...prev.altarTask!, status: 'failed' } }));
+      import('./lib/sfx').then(({ playSound }) => playSound('error'));
+    }
+  }, []);
+
+  useEffect(() => {
+    safeStorageSet('questlog_ai_settings', JSON.stringify(aiSettings));
   }, [aiSettings]);
 
   useEffect(() => {
-    localStorage.setItem('questlog_game_state', JSON.stringify(gameState));
+    safeStorageSet('questlog_game_state', JSON.stringify(gameState));
   }, [gameState]);
 
   useEffect(() => {
@@ -645,32 +727,48 @@ export default function App() {
           const newHistory = { ...(prev.dailyPointsHistory || {}) };
           newHistory[todayStr] = prev.dailyGrossPoints || 0;
 
+          // Siege Penalty: if 5 events exist, lose 10% gold
+          let newGold = prev.gold;
+          if (gameState.events && gameState.events.length >= 5) {
+            newGold = Math.floor(newGold * 0.9);
+          }
+
           return {
             ...prev,
             combo: newCombo,
+            gold: newGold,
             dailyGrossPoints: 0,
             dailyTasksCompleted: 0,
             dailyPointsHistory: newHistory
           };
         });
 
-        // Generate random encounter
+        // Generate random encounter / Map Event
         if (effectiveApiKey) {
           const weakestStat = Object.entries(player.stats).reduce((a, b) => a[1] < b[1] ? a : b)[0];
           const existingTaskTexts = tasks.map(t => t.text);
           import('./lib/ai').then(m => m.generateRandomEncounter(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, weakestStat, existingTaskTexts)).then(encounter => {
             if (encounter) {
-              setGmMessage(`Случайная встреча: ${encounter.story}`);
-              setTasks(prevTasks => [{
-                id: Date.now().toString() + Math.random(),
-                text: encounter.task,
-                stat: encounter.stat || 'unknown',
-                type: 'one-off',
-                completed: false,
-                rewarded: false,
-                createdAt: Date.now(),
-                difficulty: encounter.difficulty || 2
-              }, ...prevTasks]);
+              setGameState(prevGS => {
+                const currentEvents = prevGS.events || [];
+                if (currentEvents.length >= 5) return prevGS; // City under siege
+                
+                // Find empty zones
+                const availableZones = Array.from({length: 10}, (_, i) => i).filter(i => !currentEvents.some(e => e.zoneIndex === i));
+                if (availableZones.length === 0) return prevGS;
+                
+                const randomZone = availableZones[Math.floor(Math.random() * availableZones.length)];
+                
+                const newEvent = {
+                  id: crypto.randomUUID(),
+                  zoneIndex: randomZone,
+                  description: encounter.story,
+                  taskPrompt: encounter.task,
+                  rewardGold: (encounter.difficulty || 1) * 15
+                };
+                
+                return { ...prevGS, events: [...currentEvents, newEvent] };
+              });
             }
           });
         }
@@ -689,9 +787,9 @@ export default function App() {
           return prevGS;
         });
 
-        localStorage.setItem('questlog_last_daily_reset', now.getTime().toString());
+        safeStorageSet('questlog_last_daily_reset', now.getTime().toString());
       } else if (lastReset === 0) {
-        localStorage.setItem('questlog_last_daily_reset', now.getTime().toString());
+        safeStorageSet('questlog_last_daily_reset', now.getTime().toString());
       }
 
       // Weekly Reset Logic
@@ -759,11 +857,11 @@ export default function App() {
   }, [tasks, boss, gameState.lastWeeklyReset, campaign]);
 
   useEffect(() => {
-    localStorage.setItem('questlog_tasks_v2', JSON.stringify(tasks));
+    safeStorageSet('questlog_tasks_v2', JSON.stringify(tasks));
   }, [tasks]);
 
   useEffect(() => {
-    localStorage.setItem('questlog_player_v4', JSON.stringify(player));
+    safeStorageSet('questlog_player_v4', JSON.stringify(player));
   }, [player]);
 
   useEffect(() => {
@@ -773,12 +871,12 @@ export default function App() {
   }, [bossFailed]);
 
   useEffect(() => {
-    localStorage.setItem('questlog_boss_v3', JSON.stringify(boss));
+    safeStorageSet('questlog_boss_v3', JSON.stringify(boss));
   }, [boss]);
 
   useEffect(() => {
     if (campaign) {
-      localStorage.setItem('questlog_campaign', JSON.stringify(campaign));
+      safeStorageSet('questlog_campaign', JSON.stringify(campaign));
     } else {
       localStorage.removeItem('questlog_campaign');
     }
@@ -1048,7 +1146,7 @@ export default function App() {
     }
 
     setTasks([{ 
-      id: Date.now().toString(), 
+      id: crypto.randomUUID(), 
       text: newTask, 
       stat: statToUse,
       type: newTaskType,
@@ -1137,7 +1235,7 @@ export default function App() {
               
               newTasks.push({
                 ...pt,
-                id: Date.now().toString() + Math.random(),
+                id: crypto.randomUUID(),
                 completed: false,
                 rewarded: false,
                 createdAt: Date.now(),
@@ -1177,7 +1275,7 @@ export default function App() {
             
             newTasks.push({
               ...pt,
-              id: Date.now().toString() + Math.random(),
+              id: crypto.randomUUID(),
               completed: false,
               rewarded: false,
               createdAt: Date.now(),
@@ -1272,41 +1370,7 @@ export default function App() {
     }
   };
 
-  const changeFamiliar = async () => {
-    if (player.gold < 100) return;
-    if (!effectiveApiKey) {
-      setGmMessage("Для смены питомца нужен API ключ.");
-      return;
-    }
-    
-    setPlayer(prev => ({ ...prev, gold: prev.gold - 100 }));
-    setIsGeneratingBoss(true);
-    setGmMessage("Ищем нового питомца...");
-    
-    try {
-      const data = await import('./lib/ai').then(m => m.generateFamiliar(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.playerClass || 'Новичок', 'baby', undefined, aiSettings.enableImages, aiSettings.imageModel, aiSettings.apiKey, aiSettings.baseUrl));
-      if (data) {
-        setPlayer(prev => ({
-          ...prev,
-          familiar: { 
-            name: data.name, 
-            type: data.type, 
-            stage: 'baby', 
-            buffActive: true,
-            xp: 0,
-            level: 1,
-            imageUrl: data.imageUrl
-          }
-        }));
-        setGmMessage(`Новый питомец: ${data.name} (${data.type})!`);
-      }
-    } catch (e) {
-      console.error("Change familiar failed", e);
-      setGmMessage("Не удалось найти нового питомца.");
-    } finally {
-      setIsGeneratingBoss(false);
-    }
-  };
+
 
   const handleAttack = () => {
     const totalPending = (Object.values(player.pendingDamage) as number[]).reduce((a, b) => a + b, 0);
@@ -1414,6 +1478,8 @@ export default function App() {
   };
 
   const handleBossDefeated = async () => {
+    setIsGeneratingBoss(true); // Disable button immediately to prevent double clicks
+    
     const isCampaignFinished = campaign && campaign.currentEnemyIndex >= campaign.enemies.length - 1;
     setVictoryMessage(isCampaignFinished ? "Кампания завершена!" : "Босс повержен!");
     setShowVictory(true);
@@ -1444,10 +1510,23 @@ export default function App() {
         req = getXpRequirement(newLevel);
       }
       finalLevel = newLevel;
+
+      let newFamiliar = prev.familiar;
+      // Hatch or evolve familiar on main boss defeat
+      if (newFamiliar && (isCampaignFinished || !campaign)) {
+        let newStage = newFamiliar.stage;
+        if (newStage === 'egg') newStage = 'baby';
+        else if (newStage === 'baby') newStage = 'evolved';
+        else if (newStage === 'evolved') newStage = 'ultra';
+        
+        newFamiliar = { ...newFamiliar, stage: newStage };
+      }
+
       return { 
         ...prev, 
         level: newLevel, 
-        xp: newXp
+        xp: newXp,
+        familiar: newFamiliar
       };
     });
 
@@ -1481,15 +1560,31 @@ export default function App() {
       setCampaign(prev => prev ? { ...prev, currentEnemyIndex: nextIndex } : null);
       setBoss(nextBoss || generateBoss(finalLevel, player.dailyPointsHistory, player.inventory));
       setGameState(prev => ({ ...prev, defeatedBosses: newDefeated }));
+      setIsGeneratingBoss(false);
       return;
     }
 
     // Campaign finished or no campaign, generate new one
     if (effectiveApiKey || effectiveAiBaseUrl) {
       setIsGeneratingBoss(true);
+      setGenerationProgress(0);
+      setGenerationStep('Анализ истории...');
       try {
-        const aiCampaign = await generateAICampaign(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.stats, newDefeated, gameState.currentStory, finalLevel, player.dailyPointsHistory, player.inventory, gameState.nemesisBoss || undefined, gameState.chronicle);
+        let chronicleToPass = { ...gameState.chronicle };
+        const isSeasonEnded = chronicleToPass.season_info && chronicleToPass.season_info.current_campaign >= chronicleToPass.season_info.total_campaigns;
         
+        if (isSeasonEnded) {
+          delete chronicleToPass.season_info;
+          setVictoryMessage("Сезон завершен!");
+          setGmMessage("Глава закончена. Открывается новая страница твоей истории...");
+        }
+
+        setGenerationProgress(10);
+        setGenerationStep('Создаем новые земли...');
+        const aiCampaign = await generateAICampaign(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.stats, newDefeated, gameState.currentStory, finalLevel, player.dailyPointsHistory, player.inventory, gameState.nemesisBoss || undefined, chronicleToPass);
+        
+        setGenerationProgress(30);
+        setGenerationStep('Подготовка рынка...');
         // Generate shop items pool for the campaign
         try {
           const { generateShopItems } = await import('./lib/ai');
@@ -1503,6 +1598,8 @@ export default function App() {
           console.error("Shop items generation failed", shopErr);
         }
 
+        setGenerationProgress(45);
+        setGenerationStep('Рисуем карту кампании...');
         // Generate map image
         if (aiCampaign.campaign.mapPrompt) {
            try {
@@ -1512,8 +1609,44 @@ export default function App() {
              console.error("Map image generation failed", imgError);
            }
         }
+        
+        setGenerationProgress(60);
+        setGenerationStep('Создание архитектуры города...');
+        // Generate city map image if needed
+        if (aiCampaign.newSeasonInfo?.city_background_prompt && !aiCampaign.newSeasonInfo.city_background_url) {
+           try {
+             const cityUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", aiCampaign.newSeasonInfo.city_background_prompt, aiSettings.enableImages, "9:16");
+             aiCampaign.newSeasonInfo.city_background_url = cityUrl || undefined;
+           } catch (imgError) {
+             console.error("City image generation failed", imgError);
+           }
+        }
 
+        setGenerationProgress(70);
+        setGenerationStep('Призыв жителей города...');
+        if (aiCampaign.newSeasonInfo?.npcs) {
+          const npcsList = Object.values(aiCampaign.newSeasonInfo.npcs);
+          const totalNpcs = npcsList.length;
+          let npcIndex = 0;
+          for (const npc of npcsList) {
+             try {
+                if (npc.imagePrompt && !npc.imageUrl) {
+                   console.log(`[Game] Requesting image for NPC: ${npc.name}`);
+                   npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "9:16") || undefined;
+                }
+             } catch(err) {
+                console.error("NPC generation failed", err);
+             }
+             npcIndex++;
+             setGenerationProgress(70 + Math.floor((10 * npcIndex) / totalNpcs));
+          }
+        }
+
+        setGenerationProgress(80);
+        setGenerationStep('Призыв монстров...');
         // Generate enemy images and their drops
+        const totalEnemies = aiCampaign.campaign.enemies.length;
+        let enemyIndex = 0;
         for (let enemy of aiCampaign.campaign.enemies) {
           if (enemy.imagePrompt) {
             try {
@@ -1536,10 +1669,34 @@ export default function App() {
               console.error("Trophy image generation failed", imgError);
             }
           }
+          enemyIndex++;
+          setGenerationProgress(80 + Math.floor((20 * enemyIndex) / totalEnemies));
         }
+
+        setGenerationProgress(100);
+        setGenerationStep('Завершение...');
 
         setCampaign(aiCampaign.campaign);
         setBoss(aiCampaign.campaign.enemies[0] || generateBoss(finalLevel, player.dailyPointsHistory, player.inventory));
+        
+        if (aiCampaign.masterTask) {
+          setTasks(prev => {
+            const newTasks = prev.filter(t => !t.isMasterTask);
+            newTasks.push({
+              id: crypto.randomUUID(),
+              text: aiCampaign.masterTask.text,
+              stat: aiCampaign.masterTask.stat || 'strength',
+              type: 'weekly',
+              difficulty: aiCampaign.masterTask.difficulty || 4,
+              createdAt: Date.now(),
+              completed: false,
+              rewarded: false,
+              isMasterTask: true,
+              availableAt: Date.now()
+            });
+            return newTasks;
+          });
+        }
         
         const initialShopItems = aiCampaign.campaign.itemPool ? [...aiCampaign.campaign.itemPool].sort(() => 0.5 - Math.random()).slice(0, 3) : [];
         
@@ -1548,7 +1705,11 @@ export default function App() {
           defeatedBosses: newDefeated, 
           currentStory: aiCampaign.newStoryContext,
           nemesisBoss: null,
-          shopItems: prev.shopItems.length > 0 ? prev.shopItems : initialShopItems
+          shopItems: prev.shopItems.length > 0 ? prev.shopItems : initialShopItems,
+          chronicle: {
+            ...prev.chronicle,
+            season_info: aiCampaign.newSeasonInfo || prev.chronicle.season_info
+          }
         }));
       } catch (e: any) {
         console.error("AI Campaign generation failed", e);
@@ -1565,6 +1726,7 @@ export default function App() {
         defeatedBosses: newDefeated,
         nemesisBoss: boss.isNemesis ? null : prev.nemesisBoss
       }));
+      setIsGeneratingBoss(false);
     }
   };
 
@@ -1584,58 +1746,23 @@ export default function App() {
     }
   };
 
-  const askGMForTasks = async () => {
-    if (!effectiveApiKey && !effectiveAiBaseUrl) return;
-    
-    const now = Date.now();
-    
-    // Check if we already generated tasks for the current campaign/boss
-    const currentTargetId = campaign ? campaign.id : boss.id;
-    if (gameState.lastGMTaskGeneration === currentTargetId) {
-      setGmMessage(`Я уже давал тебе задания для этой цели. Сфокусируйся на них.`);
-      return;
-    }
-
-    setIsGeneratingTasks(true);
-    try {
-      const existingTaskTexts = tasks.map(t => t.text);
-      const allBosses = campaign ? campaign.enemies : [boss];
-      const newTasks = await generateTasks(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.stats, boss, existingTaskTexts, allBosses, gameState.chronicle);
-      const tasksToAdd = newTasks.map((t: any) => ({
-        id: Date.now().toString() + Math.random(),
-        text: t.text,
-        stat: t.stat,
-        type: 'one-off',
-        completed: false,
-        rewarded: false,
-        createdAt: Date.now(),
-        availableAt: Date.now(),
-        isMasterTask: t.isMasterTask,
-        difficulty: t.difficulty || 2,
-        expiresAt: campaign ? campaign.deadline : boss.expiresAt
-      }));
-      setTasks(prev => [...tasksToAdd, ...prev]);
-      setGameState(prev => ({ ...prev, lastGMTaskGeneration: currentTargetId }));
-      setGmMessage("Я добавил новые задания в твой журнал. Выполни их, чтобы подготовиться к грядущим испытаниям.");
-    } catch (e: any) {
-      console.error(e);
-      setApiError(e?.message || "Неизвестная ошибка при генерации заданий");
-      setGmMessage("Мастер сейчас занят, произошла ошибка.");
-    } finally {
-      setIsGeneratingTasks(false);
-    }
-  };
-
   const handleTestGenerateBoss = async (forcedNemesis?: Boss, isReroll: boolean = false) => {
     if (!effectiveApiKey && !effectiveAiBaseUrl) {
       setGmMessage("Пожалуйста, укажите API ключ или Base URL в настройках.");
       return;
     }
     setIsGeneratingBoss(true);
+    setGenerationProgress(0);
+    setGenerationStep('Сбор данных...');
     try {
       const nemesisToUse = forcedNemesis !== undefined ? forcedNemesis : (gameState.nemesisBoss || undefined);
+      
+      setGenerationProgress(10);
+      setGenerationStep('Создаем новые земли...');
       const aiCampaign = await generateAICampaign(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.stats, gameState.defeatedBosses, gameState.currentStory, player.level, player.dailyPointsHistory, player.inventory, nemesisToUse, gameState.chronicle, isReroll);
       
+      setGenerationProgress(30);
+      setGenerationStep('Подготовка рынка...');
       // Generate shop items pool for the campaign
       try {
         const { generateShopItems } = await import('./lib/ai');
@@ -1649,6 +1776,8 @@ export default function App() {
         console.error("Shop items generation failed", shopErr);
       }
 
+      setGenerationProgress(45);
+      setGenerationStep('Рисуем карту кампании...');
       if (aiCampaign.campaign.mapPrompt) {
          try {
            const mapUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", aiCampaign.campaign.mapPrompt, aiSettings.enableImages);
@@ -1658,6 +1787,40 @@ export default function App() {
          }
       }
 
+      setGenerationProgress(60);
+      setGenerationStep('Создание архитектуры города...');
+      if (aiCampaign.newSeasonInfo?.city_background_prompt && !aiCampaign.newSeasonInfo.city_background_url) {
+         try {
+           const cityUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", aiCampaign.newSeasonInfo.city_background_prompt, aiSettings.enableImages, "9:16");
+           aiCampaign.newSeasonInfo.city_background_url = cityUrl || undefined;
+         } catch (imgError) {
+           console.error("City image generation failed", imgError);
+         }
+      }
+
+      setGenerationProgress(70);
+      setGenerationStep('Призыв жителей города...');
+      if (aiCampaign.newSeasonInfo?.npcs) {
+        const npcsList = Object.values(aiCampaign.newSeasonInfo.npcs);
+        const totalNpcs = npcsList.length;
+        let npcIndex = 0;
+        for (const npc of npcsList) {
+           try {
+              if (npc.imagePrompt && !npc.imageUrl) {
+                 npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "9:16") || undefined;
+              }
+           } catch(err) {
+              console.error("NPC generation failed", err);
+           }
+           npcIndex++;
+           setGenerationProgress(70 + Math.floor((10 * npcIndex) / totalNpcs));
+        }
+      }
+
+      setGenerationProgress(80);
+      setGenerationStep('Призыв монстров...');
+      const totalEnemies = aiCampaign.campaign.enemies.length;
+      let enemyIndex = 0;
       for (let enemy of aiCampaign.campaign.enemies) {
         if (enemy.imagePrompt) {
           try {
@@ -1666,18 +1829,46 @@ export default function App() {
             console.error("Enemy image generation failed", imgError);
           }
         }
+        enemyIndex++;
+        setGenerationProgress(80 + Math.floor((20 * enemyIndex) / totalEnemies));
       }
+
+      setGenerationProgress(100);
+      setGenerationStep('Завершение...');
 
       setCampaign(aiCampaign.campaign);
       setBoss(aiCampaign.campaign.enemies[0] || generateBoss(player.level, player.dailyPointsHistory, player.inventory));
       
+      if (aiCampaign.masterTask) {
+        setTasks(prev => {
+          const newTasks = prev.filter(t => !t.isMasterTask);
+          newTasks.push({
+            id: crypto.randomUUID(),
+            text: aiCampaign.masterTask.text,
+            stat: aiCampaign.masterTask.stat || 'strength',
+            type: 'weekly',
+            difficulty: aiCampaign.masterTask.difficulty || 4,
+            createdAt: Date.now(),
+            completed: false,
+            rewarded: false,
+            isMasterTask: true,
+            availableAt: Date.now()
+          });
+          return newTasks;
+        });
+      }
+
       const initialShopItems = aiCampaign.campaign.itemPool ? [...aiCampaign.campaign.itemPool].sort(() => 0.5 - Math.random()).slice(0, 3) : [];
       
       setGameState(prev => ({ 
         ...prev, 
         currentStory: aiCampaign.newStoryContext, 
         nemesisBoss: null,
-        shopItems: prev.shopItems.length > 0 ? prev.shopItems : initialShopItems
+        shopItems: prev.shopItems.length > 0 ? prev.shopItems : initialShopItems,
+        chronicle: {
+          ...prev.chronicle,
+          season_info: aiCampaign.newSeasonInfo || prev.chronicle.season_info
+        }
       }));
       setGmMessage("Я создал для тебя новую кампанию!");
     } catch (e: any) {
@@ -2282,7 +2473,7 @@ export default function App() {
         </AnimatePresence>
 
         {/* Content */}
-        <main className={`flex-1 scrollbar-hide p-4 overflow-y-auto ${activeTab === 'boss' ? 'flex flex-col' : ''}`}>
+        <main className={`flex-1 scrollbar-hide ${activeTab === 'city' ? 'p-0 overflow-hidden relative' : 'p-4 overflow-y-auto'} ${activeTab === 'boss' ? 'flex flex-col' : ''}`}>
           {activeTab === 'quests' && (
             <div className="flex flex-col min-h-full">
               <div className="space-y-6 flex-1">
@@ -2418,7 +2609,7 @@ export default function App() {
 
               <div className="space-y-4">
                 {(() => {
-                  const visibleTasks = tasks.filter(t => !t.availableAt || t.availableAt <= Date.now());
+                  const visibleTasks = tasks.filter(t => (!t.availableAt || t.availableAt <= Date.now()));
                   const activeTasks = visibleTasks.filter(t => !t.completed);
                   const pendingTasks = visibleTasks.filter(t => t.completed && !t.rewarded);
                   const finishedTasks = visibleTasks.filter(t => t.completed && t.rewarded);
@@ -2433,7 +2624,7 @@ export default function App() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
-                        key={task.id}
+                        key={`task-${task.id}`}
                         onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
                         className={`group flex items-center gap-3 p-4 transition-all glass-card cursor-pointer shadow-md ${
                           task.completed
@@ -2528,7 +2719,7 @@ export default function App() {
                                     if (subtasksTexts.length > 0) {
                                       setTasks(prev => prev.map(t => t.id === task.id ? {
                                         ...t,
-                                        subtasks: subtasksTexts.map((text: string) => ({ id: Date.now().toString() + Math.random(), text, completed: false }))
+                                        subtasks: subtasksTexts.map((text: string) => ({ id: crypto.randomUUID(), text, completed: false }))
                                       } : t));
                                     }
                                   } catch (err) {
@@ -2589,8 +2780,8 @@ export default function App() {
                           <h3 className="text-[17px] font-bold text-white mt-2 mb-1">Сегодня</h3>
                           <div className="space-y-3">
                             <AnimatePresence mode="popLayout">
-                              {activeTasks.map(renderTask)}
-                              {pendingTasks.map(renderTask)}
+                              {activeTasks.map(t => renderTask(t))}
+                              {pendingTasks.map(t => renderTask(t))}
                             </AnimatePresence>
                           </div>
                         </>
@@ -2641,15 +2832,37 @@ export default function App() {
           {activeTab === 'boss' && (
             <div className="flex flex-col flex-1 space-y-3 min-h-full">
               {isGeneratingBoss ? (
-                <div className="flex-1 flex flex-col items-center justify-center space-y-4 min-h-[50vh]">
-                  <Loader2 size={48} className="animate-spin text-amber-500 mx-auto" />
-                  <p className="text-amber-400 font-bold animate-pulse">Мастер создает новую кампанию...</p>
+                <div className="flex-1 flex flex-col items-center justify-center space-y-6 min-h-[50vh] px-8">
+                  <div className="relative">
+                    <Loader2 size={48} className="animate-spin text-amber-500 mx-auto opacity-50" />
+                    <div className="absolute inset-0 flex items-center justify-center font-black text-amber-400 text-xs">
+                      {generationProgress}%
+                    </div>
+                  </div>
+                  <div className="w-full max-w-[240px] space-y-3 text-center">
+                    <p className="text-amber-400/80 font-bold text-xs uppercase tracking-widest">{generationStep || 'Инициализация...'}</p>
+                    <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/5 shadow-inner">
+                      <motion.div
+                        className="h-full bg-amber-500 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${generationProgress}%` }}
+                        transition={{ duration: 0.3 }}
+                      />
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
                   {/* Campaign Map (Compact) */}
                   {campaign ? (
                     <div className="w-full mb-2">
+                        {gameState.chronicle.season_info && (
+                          <div className="w-full text-center mb-3 mt-1 relative z-10 px-2">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 shadow-lg">
+                              {gameState.chronicle.season_info.name} <span className="opacity-50 ml-1">[{gameState.chronicle.season_info.current_campaign}/{gameState.chronicle.season_info.total_campaigns}]</span>
+                            </span>
+                          </div>
+                        )}
                       <div className="flex justify-between items-center mb-3 px-1">
                         <div className="flex items-center gap-3">
                           <div className={`p-1.5 rounded-[12px] bg-[#12141A] border-2 ${THEME_COLORS[campaign.colorTheme || 'slate'].border} ${THEME_COLORS[campaign.colorTheme || 'slate'].text} ${THEME_COLORS[campaign.colorTheme || 'slate'].dropShadow} shadow-lg relative overflow-hidden`}>
@@ -2678,7 +2891,7 @@ export default function App() {
                             const isDefeated = idx < campaign.currentEnemyIndex;
                             
                             return (
-                              <div key={enemy.id} className="relative flex flex-col items-center">
+                              <div key={`${enemy.id}-${idx}`} className="relative flex flex-col items-center">
                                 {/* Path line */}
                                 {idx < campaign.enemies.length - 1 && (
                                   <div className={`absolute top-4 left-1/2 w-full h-0.5 -z-10 ${isDefeated ? THEME_COLORS[campaign.colorTheme || 'slate'].bg : 'bg-white/10'}`} style={{ width: 'calc(100% + 2.5rem)', opacity: isDefeated ? 0.5 : 1 }} />
@@ -2974,9 +3187,15 @@ export default function App() {
                   )}
 
                   {player.familiar && (
-                    <div className="mt-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex flex-col gap-3 text-left relative">
+                    <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col gap-3 text-left relative">
                       <div className="flex items-center gap-3">
-                        <div className="w-14 h-14 rounded-full bg-[#0B0E14] border-2 border-indigo-500/50 flex items-center justify-center text-3xl shadow-[0_0_10px_rgba(99,102,241,0.3)] overflow-hidden shrink-0">
+                        <div className={`w-14 h-14 rounded-full bg-[#0B0E14] border-2 flex items-center justify-center text-3xl overflow-hidden shrink-0 ${
+                          player.familiar.status === 'injured' ? 'border-red-500/50 grayscale shadow-[0_0_10px_rgba(239,68,68,0.3)]' :
+                          player.familiar.rarity === 'legendary' ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.5)]' :
+                          player.familiar.rarity === 'epic' ? 'border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.4)]' :
+                          player.familiar.rarity === 'rare' ? 'border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.3)]' :
+                          'border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+                        }`}>
                           {player.familiar.imageUrl ? (
                             <img src={player.familiar.imageUrl} alt={player.familiar.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           ) : (
@@ -2986,30 +3205,42 @@ export default function App() {
                           )}
                         </div>
                         <div className="flex-1">
-                          <h4 className="text-sm font-bold text-indigo-400 flex items-center gap-2">
+                          <h4 className={`text-sm font-bold flex items-center gap-2 ${
+                              player.familiar.status === 'injured' ? 'text-red-400' :
+                              player.familiar.rarity === 'legendary' ? 'text-amber-400' :
+                              player.familiar.rarity === 'epic' ? 'text-purple-400' :
+                              player.familiar.rarity === 'rare' ? 'text-blue-400' :
+                              'text-emerald-400'
+                            }`}>
                             {player.familiar.name}
-                            <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30">
+                            <span className="text-[10px] bg-black/50 px-1.5 py-0.5 rounded border border-white/10 text-white">
                               Ур. {player.familiar.level}
                             </span>
                           </h4>
-                          <p className="text-xs text-indigo-300/70">{player.familiar.type}</p>
-                          {player.familiar.buffActive && (
+                          <p className="text-xs text-slate-400">
+                            {player.familiar.type} 
+                            {player.familiar.status === 'injured' && <span className="text-red-400 font-bold ml-2">(Ранен)</span>}
+                          </p>
+                          {player.familiar.status === 'active' && player.familiar.stage !== 'egg' && (
                             <span className="text-[10px] text-emerald-400 mt-1 block">
                               Бафф: +{Math.round(getFamiliarBuff(player.combo, player.familiar) * 100)}% к урону
                             </span>
+                          )}
+                          {player.familiar.stage === 'egg' && (
+                            <span className="text-[10px] text-amber-400 mt-1 block italic">Ожидает победы над Главным Боссом...</span>
                           )}
                         </div>
                       </div>
                       
                       {/* Pet XP Bar */}
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[9px] text-indigo-300/70 font-medium uppercase tracking-wider">
+                        <div className="flex justify-between text-[9px] text-emerald-300/70 font-medium uppercase tracking-wider">
                           <span>Опыт питомца</span>
                           <span>{player.familiar.xp} / {player.familiar.level * 100}</span>
                         </div>
                         <div className="h-1.5 bg-[#0B0E14] rounded-full overflow-hidden shadow-inner border border-white/5 relative">
                           <motion.div
-                            className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 relative"
+                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 relative"
                             initial={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
                             animate={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
                             transition={{ type: 'spring', bounce: 0 }}
@@ -3017,13 +3248,11 @@ export default function App() {
                         </div>
                       </div>
                       
-                      <button 
-                        onClick={changeFamiliar}
-                        disabled={player.gold < 100 || isGeneratingBoss}
-                        className="absolute top-2 right-2 text-[10px] bg-[#0B0E14] border border-indigo-500/30 text-indigo-300 px-2 py-1 rounded hover:bg-indigo-500/20 transition-colors disabled:opacity-50 flex items-center gap-1"
-                      >
-                        Сменить (100 <Coins size={10} />)
-                      </button>
+                      {player.familiar.status === 'active' && player.familiar.stage !== 'egg' && (
+                        <div className="w-full mt-2 py-2 text-center text-emerald-400/50 rounded-lg text-xs font-medium border border-emerald-500/10 transition-colors shadow-sm italic cursor-not-allowed">
+                          Отправьте питомца в экспедицию через Гильдию Питомцев в Городе
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3117,9 +3346,9 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-4 gap-3">
-                    {player.inventory.map((trophy) => (
+                    {player.inventory.map((trophy, idx) => (
                       <button
-                        key={trophy.id}
+                        key={`${trophy.id}-${idx}`}
                         onClick={() => setSelectedTrophy(trophy)}
                         className="aspect-square glass-card flex items-center justify-center text-3xl hover:bg-white/5 transition-colors relative group overflow-hidden"
                       >
@@ -3136,101 +3365,98 @@ export default function App() {
               </div>
             </div>
           )}
-          {activeTab === 'shop' && (
-            <div className="space-y-6">
-              <div className="glass-card p-6 text-center space-y-4">
-                <div className="w-20 h-20 bg-[#0B0E14] rounded-full border-4 border-amber-500/20 mx-auto flex items-center justify-center shadow-inner mb-2 relative">
-                  <ShoppingBag size={40} className="text-amber-400" />
-                  <div className="absolute -bottom-2 -right-2 bg-amber-500 text-[#0B0E14] text-xs font-bold px-2 py-1 rounded-lg border-2 border-[#0B0E14]">
-                    {player.gold} <Coins size={12} className="inline" />
+          {activeTab === 'city' && (
+            <div className="relative w-full h-full overflow-hidden">
+              {/* Background Map */}
+              <div 
+                className="absolute inset-0 bg-cover bg-center bg-[#0B0E14]"
+                style={{ 
+                  backgroundImage: gameState.chronicle?.season_info?.city_background_url 
+                    ? `url(${gameState.chronicle.season_info.city_background_url})` 
+                    : `linear-gradient(to bottom, #1a1c29, #0f111a)` 
+                }}
+              />
+              {/* Overlay */}
+              <div className="absolute inset-0 bg-[#0B0E14]/60 backdrop-blur-[2px]" />
+              
+              {/* Event Zones rendering */}
+              {gameState.events && gameState.events.length >= 5 && (
+                <div className="absolute top-4 left-0 right-0 z-[50] flex justify-center pointer-events-none">
+                  <div className="bg-red-900/90 border border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.8)] text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                    <Flame size={16} className="text-red-400" />
+                    Осада Города
                   </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-amber-400 flex items-center justify-center gap-2">
-                    Лавка Странника
-                  </h2>
-                  <p className="text-sm text-slate-400 italic mt-2">
-                    "Редкие товары для тех, кто не боится трудностей. Ассортимент обновляется каждый день."
-                  </p>
-                </div>
+              )}
+
+              <AnimatePresence>
+                {gameState.events?.map((event, idx) => {
+                  const P = [
+                    { t: '15%', l: '15%' }, { t: '15%', l: '85%' }, { t: '85%', l: '15%' }, { t: '85%', l: '85%' },
+                    { t: '25%', l: '15%' }, { t: '60%', l: '80%' }, { t: '40%', l: '45%' }, { t: '70%', l: '50%' },
+                    { t: '45%', l: '10%' }, { t: '20%', l: '50%' }
+                  ];
+                  const pos = P[event.zoneIndex % 10];
+                  return (
+                    <motion.button
+                      key={`${event.id}-${idx}`}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      onClick={() => setActiveEvent(event)}
+                      className="absolute z-[40] w-12 h-12 -ml-6 -mt-6 rounded-full flex flex-col items-center justify-center animate-pulse"
+                      style={{ top: pos.t, left: pos.l }}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-red-900/80 border-2 border-red-500 flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.6)] font-black text-xl text-red-100">
+                        !
+                      </div>
+                    </motion.button>
+                  );
+                })}
+              </AnimatePresence>
+
+              {/* City Nodes */}
+              <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '70%', left: '30%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
+                <button onClick={() => setShowShopNode(true)} className="w-14 h-14 rounded-full bg-black/80 backdrop-blur-md border-[2px] border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] flex items-center justify-center mb-1 animate-[pulse_2s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
+                   <Skull className="text-purple-400" size={24} />
+                </button>
+                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/60 px-2 py-0.5 rounded-full border border-purple-500/30 relative z-10">Теневой Рынок</span>
               </div>
 
-              <div className="space-y-3">
-                {gameState.shopItems.length === 0 ? (
-                  <div className="glass-card p-6 text-center">
-                    <p className="text-slate-500 text-sm">Торговец еще не прибыл. Выполняйте задания, чтобы привлечь его внимание.</p>
-                  </div>
-                ) : (
-                  gameState.shopItems.map((item, index) => (
-                    <div key={index} className="glass-card p-4 flex gap-4 items-center">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                        item.rarity === 'gold' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50' :
-                        item.rarity === 'purple' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50' :
-                        item.rarity === 'blue' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50' :
-                        'bg-slate-500/20 text-slate-400 border border-slate-500/50'
-                      }`}>
-                        {item.effect.type === 'heal_boss' ? <Heart size={24} /> :
-                         item.effect.type === 'damage_boost' ? <Sword size={24} /> :
-                         item.effect.type === 'pet_food' ? <span className="text-2xl">🍖</span> :
-                         <Zap size={24} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-bold text-sm truncate ${
-                          item.rarity === 'gold' ? 'text-amber-400' :
-                          item.rarity === 'purple' ? 'text-purple-400' :
-                          item.rarity === 'blue' ? 'text-blue-400' :
-                          'text-slate-300'
-                        }`}>{item.name}</h4>
-                        <p className="text-xs text-slate-500 italic truncate">{item.lore}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (player.gold >= item.price) {
-                            setPlayer(prev => ({ ...prev, gold: prev.gold - item.price }));
-                            // Apply effect
-                            if (item.effect.type === 'heal_boss') {
-                              setBoss(prev => ({ ...prev, hp: Math.min(prev.maxHp, prev.hp + item.effect.value) }));
-                            } else if (item.effect.type === 'damage_boost') {
-                              setPlayer(prev => ({
-                                ...prev,
-                                pendingDamage: {
-                                  ...prev.pendingDamage,
-                                  strength: prev.pendingDamage.strength + item.effect.value
-                                }
-                              }));
-                            } else if (item.effect.type === 'xp_boost') {
-                              setPlayer(prev => ({ ...prev, xp: prev.xp + item.effect.value }));
-                            } else if (item.effect.type === 'pet_food') {
-                              feedFamiliar(item.effect.value);
-                            }
-                            // Remove item from shop
-                            setGameState(prev => ({
-                              ...prev,
-                              shopItems: prev.shopItems.filter((_, i) => i !== index)
-                            }));
-                            import('./lib/sfx').then(({ playSound }) => playSound('coin'));
-                          }
-                        }}
-                        disabled={player.gold < item.price}
-                        className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                          player.gold >= item.price 
-                            ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30' 
-                            : 'bg-[#0B0E14] text-slate-600 border border-white/5'
-                        }`}
-                      >
-                        {item.price} <Coins size={14} />
-                      </button>
-                    </div>
-                  ))
-                )}
+              <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '65%', left: '75%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
+                <button onClick={() => setShowExpeditionNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.6)] flex items-center justify-center mb-1 z-10 transition-transform active:scale-95 hover:bg-blue-500/20">
+                   <Compass className="text-blue-400" size={24} />
+                </button>
+                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Экспедиции</span>
+              </div>
+
+              <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '30%', left: '60%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
+                <button onClick={() => setShowFortuneTellerNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.6)] flex items-center justify-center mb-1 animate-[pulse_3s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
+                   <Eye className="text-fuchsia-400" size={24} />
+                </button>
+                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Слепая Гадалка</span>
+              </div>
+
+              <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '15%', left: '50%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
+                <button onClick={() => setShowAltarNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.6)] flex items-center justify-center mb-1 animate-[pulse_4s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
+                   <Flame className="text-rose-400" size={24} />
+                </button>
+                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Алтарь Клятв</span>
+              </div>
+
+              <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '50%', left: '20%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
+                <button onClick={() => setShowBeastNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.6)] flex items-center justify-center mb-1 animate-[pulse_2.5s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
+                   <Dna className="text-emerald-400" size={24} />
+                </button>
+                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Торговка Зверьем</span>
               </div>
             </div>
           )}
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="shrink-0 w-full bg-[#0B0E14]/90 backdrop-blur-lg border-t border-white/5 pb-safe z-50">
-          <div className="flex justify-around items-center h-16 px-2">
+        <nav className="shrink-0 w-full bg-[#0B0E14]/90 backdrop-blur-lg border-t border-white/5 z-50 overflow-hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}>
+          <div className="flex justify-around items-center h-14 sm:h-16 px-2 mt-1">
             <button
               onClick={() => setActiveTab('quests')}
               className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
@@ -3250,13 +3476,13 @@ export default function App() {
               <span className="text-[10px] font-medium">Босс</span>
             </button>
             <button
-              onClick={() => setActiveTab('shop')}
+              onClick={() => setActiveTab('city')}
               className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${
-                activeTab === 'shop' ? 'text-amber-400' : 'text-slate-500 hover:text-slate-400'
+                activeTab === 'city' ? 'text-amber-400' : 'text-slate-500 hover:text-slate-400'
               }`}
             >
-              <ShoppingBag size={20} className={activeTab === 'shop' ? 'drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]' : ''} />
-              <span className="text-[10px] font-medium">Лавка</span>
+              <Tent size={20} className={activeTab === 'city' ? 'drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]' : ''} />
+              <span className="text-[10px] font-medium">Город</span>
             </button>
             <button
               onClick={() => setActiveTab('profile')}
@@ -3270,6 +3496,575 @@ export default function App() {
           </div>
         </nav>
       </motion.div>
+      <AnimatePresence>
+        <NPCModal
+          isOpen={showExpeditionNode}
+          onClose={() => setShowExpeditionNode(false)}
+          npcId="expedition"
+          fallbackName="Гильдия Питомцев"
+          fallbackQuote="Отправь своего зверя в дикие земли. Но помни: чем больше ты тренируешься сегодня, тем выше его шансы выжить."
+          themeColor="blue"
+          gameState={gameState}
+        >
+          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
+            <div className="h-px bg-white/20 flex-1"></div>
+            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Опасные Земли</span>
+            <div className="h-px bg-white/20 flex-1"></div>
+          </div>
+
+          {!player.familiar || player.familiar.stage === 'egg' ? (
+            <div className="mt-2 p-6 bg-black/40 border border-blue-500/20 rounded-xl text-center shadow-md pb-6">
+              <p className="text-blue-400/50 text-sm italic">Вырасти зверя, прежде чем отправлять его в дикие земли.</p>
+            </div>
+          ) : player.familiar.status === 'injured' ? (
+            <div className="mt-2 p-6 bg-red-950/40 border border-red-500/30 rounded-xl text-center shadow-md pb-6">
+              <p className="text-red-400 text-sm italic">Твой питомец тяжело ранен. Единение с природой подождет. Отнеси его к Торговке Зверьем за Кормом.</p>
+            </div>
+          ) : (
+            <div className="mt-2 space-y-4 pb-6">
+              <div className="flex items-center justify-between p-4 bg-black/40 border border-blue-500/20 rounded-xl shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-900/40 border border-blue-500/30 flex items-center justify-center text-xl">
+                    🐾
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-blue-300">{player.familiar.name} <span className="text-[10px] text-blue-500">({player.familiar.type})</span></h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Шанс успеха миссии: <span className="text-white font-bold">{Math.round(Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95) * 100)}%</span></p>
+                  </div>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  const successChance = Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95);
+                  const roll = Math.random();
+                  if (roll < successChance) {
+                    // Win
+                    const goldReward = Math.floor(Math.random() * 50) + 20;
+                    const xpReward = Math.floor(Math.random() * 30) + 10;
+                    setPlayer(prev => ({
+                      ...prev,
+                      gold: prev.gold + goldReward,
+                      familiar: prev.familiar ? { ...prev.familiar, xp: prev.familiar.xp + xpReward } : undefined
+                    }));
+                    setGmMessage(`Твой зверь вернулся с триумфом! Добыча: +${goldReward} золота, +${xpReward} опыта питомца.`);
+                    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                  } else {
+                    // Lose
+                    setPlayer(prev => ({
+                      ...prev,
+                      familiar: { ...prev.familiar!, status: 'injured', injuredUntil: Date.now() + 7 * 24 * 60 * 60 * 1000 }
+                    }));
+                    setGmMessage('Катастрофа! Питомец был изранен дикими тварями. Он не может сражаться, пока не будет исцелен.');
+                    import('./lib/sfx').then(({ playSound }) => playSound('error'));
+                  }
+                  setShowExpeditionNode(false);
+                }}
+                className="w-full py-4 bg-[#0B0E14]/80 hover:bg-blue-900/40 text-blue-300 rounded-xl text-sm font-bold border border-blue-500/50 transition-all shadow-lg hover:scale-[1.02] flex items-center justify-center gap-2 uppercase tracking-wide"
+              >
+                Отправить в Пустоши
+              </button>
+            </div>
+          )}
+        </NPCModal>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        <NPCModal
+          isOpen={showShopNode}
+          onClose={() => setShowShopNode(false)}
+          npcId="shop"
+          fallbackName="Теневой Рынок"
+          fallbackQuote="Скрытые товары для тех, кто не задает лишних вопросов."
+          themeColor="purple"
+          gameState={gameState}
+        >
+          {/* Player Gold Header */}
+          <div className="w-full flex justify-end mb-4">
+            <div className="bg-purple-900/40 px-3 py-1.5 rounded-lg border border-purple-500/50 flex items-center gap-2 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+              <span className="text-purple-300 font-bold text-sm">{player.gold}</span>
+              <Coins className="text-purple-400" size={16} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
+            <div className="h-px bg-white/20 flex-1"></div>
+            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Мои товары</span>
+            <div className="h-px bg-white/20 flex-1"></div>
+          </div>
+
+          {/* Items List */}
+          <div className="space-y-3 pb-8">
+            {gameState.shopItems.length === 0 ? (
+              <div className="bg-black/50 p-6 text-center rounded-xl border border-purple-500/20">
+                <p className="text-purple-400/50 text-sm italic">Товар распродан. Возвращайтесь завтра.</p>
+              </div>
+            ) : (
+              gameState.shopItems.map((item, index) => (
+                <div key={`shop-${index}`} className="bg-black/40 backdrop-blur-sm p-4 flex gap-4 items-center rounded-xl border border-white/5 shadow-md">
+                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${
+                    item.rarity === 'gold' ? 'bg-amber-900/40 text-amber-400 border border-amber-500/30' :
+                    item.rarity === 'purple' ? 'bg-purple-900/40 text-purple-400 border border-purple-500/30' :
+                    item.rarity === 'blue' ? 'bg-blue-900/40 text-blue-400 border border-blue-500/30' :
+                    'bg-slate-900/40 text-slate-400 border border-slate-500/30'
+                  }`}>
+                    {item.effect.type === 'heal_boss' ? <Heart size={24} /> :
+                     item.effect.type === 'damage_boost' ? <Sword size={24} /> :
+                     item.effect.type === 'pet_food' ? <span className="text-2xl drop-shadow-md">🍖</span> :
+                     <Zap size={24} />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-bold text-sm truncate ${
+                      item.rarity === 'gold' ? 'text-amber-400' :
+                      item.rarity === 'purple' ? 'text-purple-400' :
+                      item.rarity === 'blue' ? 'text-blue-400' :
+                      'text-slate-300'
+                    }`}>{item.name}</h4>
+                    <p className="text-xs text-slate-400 italic line-clamp-2 mt-0.5">{item.lore}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (player.gold >= item.price) {
+                        setPlayer(prev => ({ ...prev, gold: prev.gold - item.price }));
+                        // Apply effect
+                        if (item.effect.type === 'heal_boss') {
+                          setBoss(prev => prev ? ({ ...prev, hp: Math.min(prev.maxHp, prev.hp + item.effect.value) }) : prev);
+                        } else if (item.effect.type === 'damage_boost') {
+                          setPlayer(prev => ({
+                            ...prev,
+                            pendingDamage: {
+                              ...prev.pendingDamage,
+                              strength: prev.pendingDamage.strength + item.effect.value
+                            }
+                          }));
+                        } else if (item.effect.type === 'xp_boost') {
+                          setPlayer(prev => ({ ...prev, xp: prev.xp + item.effect.value }));
+                        } else if (item.effect.type === 'pet_food') {
+                          feedFamiliar(item.effect.value);
+                        }
+                        // Remove item from shop
+                        setGameState(prev => ({
+                          ...prev,
+                          shopItems: prev.shopItems.filter((_, i) => i !== index)
+                        }));
+                        import('./lib/sfx').then(({ playSound }) => playSound('coin'));
+                      }
+                    }}
+                    disabled={player.gold < item.price}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-bold flex flex-col items-center justify-center min-w-[70px] transition-all shadow-md ${
+                      player.gold >= item.price 
+                        ? 'bg-[#0B0E14]/80 text-purple-400 hover:bg-purple-900/40 border border-purple-500/50 hover:scale-105' 
+                        : 'bg-black/50 text-slate-600 border border-white/5'
+                    }`}
+                  >
+                    Купить
+                    <span className="flex items-center gap-1 text-xs opacity-80 font-normal mt-0.5">
+                      {item.price} <Coins size={10} />
+                    </span>
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </NPCModal>
+
+        <NPCModal
+          isOpen={showFortuneTellerNode}
+          onClose={() => setShowFortuneTellerNode(false)}
+          npcId="fortune"
+          fallbackName="Слепая Гадалка"
+          fallbackQuote="Я не вижу лиц, но вижу судьбы. За золотую монету я покажу тебе путь в тумане."
+          themeColor="fuchsia"
+          gameState={gameState}
+        >
+          {/* Player Gold Header */}
+          <div className="w-full flex justify-end mb-4">
+            <div className="bg-fuchsia-900/40 px-3 py-1.5 rounded-lg border border-fuchsia-500/50 flex items-center gap-2 shadow-[0_0_10px_rgba(217,70,239,0.2)]">
+              <span className="text-fuchsia-300 font-bold text-sm">{player.gold}</span>
+              <Coins className="text-fuchsia-400" size={16} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
+            <div className="h-px bg-white/20 flex-1"></div>
+            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Ритуал Прозрения</span>
+            <div className="h-px bg-white/20 flex-1"></div>
+          </div>
+
+          <div className="bg-black/40 backdrop-blur-sm border border-fuchsia-500/20 rounded-xl p-6 text-left shadow-md">
+            <h4 className="text-fuchsia-300 font-bold mb-3 text-base flex items-center gap-2"><Target size={18} /> Совет Мастера</h4>
+            <p className="text-sm text-slate-400 mb-6 italic leading-relaxed">Гадалка заглянет в ваши текущие задачи и статистику, чтобы подсказать, на чем стоит сосредоточиться сегодня. Она видит то, что скрыто от ваших глаз.</p>
+            
+            <button
+              onClick={() => {
+                if (player.gold >= 100) {
+                  setPlayer(prev => ({ ...prev, gold: prev.gold - 100 }));
+                  setShowFortuneTellerNode(false);
+                  askMasterForAdvice();
+                  import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                } else {
+                  setGmMessage("У вас нет 100 золота. Духи требуют равноценный обмен.");
+                }
+              }}
+              disabled={isGeneratingTasks || player.gold < 100}
+              className="w-full py-4 bg-[#0B0E14]/80 hover:bg-fuchsia-900/40 text-fuchsia-300 text-sm font-bold rounded-lg transition-all border border-fuchsia-500/50 flex items-center justify-center gap-2 disabled:opacity-50 hover:scale-[1.02] shadow-lg"
+              >
+              {isGeneratingTasks ? <Loader2 size={18} className="animate-spin" /> : (
+                <>Получить Совет <span className="opacity-50 flex items-center ml-1">(100 <Coins size={12} className="ml-0.5" />)</span></>
+              )}
+            </button>
+          </div>
+        </NPCModal>
+
+        <NPCModal
+          isOpen={showAltarNode}
+          onClose={() => setShowAltarNode(false)}
+          npcId="altar"
+          fallbackName="Алтарь Клятв"
+          fallbackQuote="Слова — ветер, но клятва крови вечна. Чего ты желаешь достичь?"
+          themeColor="rose"
+          gameState={gameState}
+          footer={
+            !gameState.altarTask || gameState.altarTask.status !== 'active' ? (
+              <div className="flex flex-col gap-3 w-full pt-1">
+                <button 
+                  onClick={async () => {
+                    if (!oathInput.trim() || !effectiveApiKey) {
+                      setGmMessage(effectiveApiKey ? "Клятва не может быть пустой." : "Для работы Вратника нужен API ключ.");
+                      return;
+                    }
+                    setIsEvaluatingOath(true);
+                    try {
+                      const { evaluateOathWithAI } = await import('./lib/ai');
+                      const result = await evaluateOathWithAI(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, oathInput);
+                      setGmMessage(result.gatekeeperMessage);
+                      if (result.accepted) {
+                        setGameState(prev => ({
+                          ...prev,
+                          altarTask: {
+                            id: crypto.randomUUID(),
+                            description: oathInput,
+                            rewardType: result.rewardType,
+                            rewardValue: result.rewardValue,
+                            deadline: Date.now() + 7 * 24 * 60 * 60 * 1000,
+                            status: 'active'
+                          }
+                        }));
+                        setShowAltarNode(false);
+                        setOathInput('');
+                        import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                      }
+                    } catch (e) {
+                      setGmMessage("Врата не отвечают. Попробуйте позже.");
+                      console.error(e);
+                    } finally {
+                      setIsEvaluatingOath(false);
+                    }
+                  }}
+                  disabled={isEvaluatingOath || !oathInput.trim()}
+                  className="w-full py-4 bg-rose-900/40 hover:bg-rose-900/60 text-rose-300 rounded-xl text-sm font-bold border border-rose-500/50 transition-all shadow-md disabled:opacity-50 hover:scale-[1.02] flex items-center justify-center gap-2"
+                >
+                  {isEvaluatingOath ? <Loader2 size={18} className="animate-spin" /> : <><Flame size={16} /> Принести Клятву</>}
+                </button>
+                <button onClick={() => setShowAltarNode(false)} className="mx-auto text-slate-400 hover:text-slate-200 text-xs text-center border-b border-transparent hover:border-slate-500 transition-all font-serif">
+                  Отойти от алтаря
+                </button>
+              </div>
+            ) : null
+          }
+        >
+          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
+            <div className="h-px bg-white/20 flex-1"></div>
+            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Кровавый Договор</span>
+            <div className="h-px bg-white/20 flex-1"></div>
+          </div>
+
+          {!gameState.altarTask || gameState.altarTask.status !== 'active' ? (
+            <div className="space-y-4 pb-2">
+              <p className="text-slate-400 text-sm leading-relaxed italic border border-rose-500/20 bg-black/40 p-4 rounded-xl">
+                «Поклянись завершить великое дело до конца недели. Если страж сочтет задачу достойной, ты получишь могущественное благословение. Осторожно: нарушишь клятву, наказание будет жестоким.»
+              </p>
+              
+              <textarea
+                value={oathInput}
+                onChange={(e) => setOathInput(e.target.value)}
+                placeholder="Я клянусь..."
+                className="w-full bg-[#0B0E14]/80 backdrop-blur-md border border-rose-500/50 rounded-xl p-4 text-slate-200 placeholder-rose-900/50 focus:outline-none focus:border-rose-400 focus:shadow-[0_0_15px_rgba(244,63,94,0.3)] resize-none h-28 text-sm transition-all"
+              />
+            </div>
+          ) : (
+            <div className="bg-rose-950/20 border border-rose-500/30 p-5 rounded-xl mt-2 text-left shadow-inner mb-6">
+              <h4 className="text-rose-400 font-bold mb-3 flex items-center gap-2">
+                <Shield size={18} className="text-rose-500" /> Текущая Клятва
+              </h4>
+              <p className="text-sm font-serif text-slate-200 mb-4 bg-[#0B0E14]/80 p-3 rounded-lg border border-white/5 line-clamp-3">
+                «{gameState.altarTask.description}»
+              </p>
+              
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => {
+                    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                    setPlayer(prev => ({
+                      ...prev,
+                      gold: gameState.altarTask!.rewardType === 'gold' ? prev.gold + (gameState.altarTask!.rewardValue as number) : prev.gold,
+                      xp: gameState.altarTask!.rewardType === 'xp' ? prev.xp + (gameState.altarTask!.rewardValue as number) : prev.xp
+                    }));
+                    setGameState(prev => ({
+                      ...prev,
+                      altarTask: { ...prev.altarTask!, status: 'completed' }
+                    }));
+                    setGmMessage("Ты исполнил клятву. Награда твоя.");
+                    setShowAltarNode(false);
+                  }}
+                  className="flex-1 py-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl text-sm font-bold border border-emerald-500/30 transition-all hover:scale-105"
+                >
+                  <CheckCircle size={18} className="mx-auto mb-1" />
+                  Исполнено
+                </button>
+                <button 
+                  onClick={() => {
+                    import('./lib/sfx').then(({ playSound }) => playSound('error'));
+                    setPlayer(prev => ({ ...prev, xp: Math.max(0, prev.xp - 100), gold: Math.max(0, prev.gold - 50) }));
+                    setGameState(prev => ({ ...prev, altarTask: { ...prev.altarTask!, status: 'failed' } }));
+                    setGmMessage("Клятва нарушена... Боги проклинают тебя (-100 XP, -50 Золота)");
+                    setShowAltarNode(false);
+                  }}
+                  className="flex-1 py-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-xl text-sm font-bold border border-rose-500/30 transition-all hover:scale-105"
+                >
+                  <X size={18} className="mx-auto mb-1" />
+                  Провалено
+                </button>
+              </div>
+              <p className="text-[10px] text-center text-slate-500 mt-4 opacity-70 flex items-center justify-center gap-1">
+                <Clock size={10} /> 
+                {Math.ceil((gameState.altarTask.deadline - Date.now()) / (1000 * 60 * 60 * 24))} дней осталось
+              </p>
+            </div>
+          )}
+        </NPCModal>
+
+        <NPCModal
+          isOpen={showBeastNode}
+          onClose={() => setShowBeastNode(false)}
+          npcId="beast"
+          fallbackName="Торговка Зверьем"
+          overrideName="ТОРГОВКА ЗВЕРЬЕМ"
+          fallbackQuote="Тебе нужен верный спутник? Или еда для него? У меня есть все."
+          themeColor="emerald"
+          gameState={gameState}
+          footer={
+            <div className="flex items-center justify-between gap-2 w-full pt-2">
+              <button className="flex-1 py-3 px-2 bg-emerald-900/30 hover:bg-emerald-900/50 rounded-xl border border-emerald-500/20 text-emerald-400 text-xs font-bold transition-colors flex items-center justify-center gap-1.5">
+                <Store size={14} />
+                Магазин
+              </button>
+              <button className="flex-1 py-3 px-2 bg-transparent hover:bg-white/5 rounded-xl border border-white/5 text-slate-400 hover:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5">
+                 <span className="text-lg leading-none">🐾</span>
+                Мои звери
+              </button>
+              <button className="flex-1 py-3 px-2 bg-transparent hover:bg-white/5 rounded-xl border border-white/5 text-slate-400 hover:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 relative">
+                <Bookmark size={14} className="rotate-90 -translate-x-0.5" />
+                Сделки дня
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              </button>
+            </div>
+          }
+        >
+          {/* Player Gold Header */}
+          <div className="absolute top-24 right-6 sm:top-20 z-30">
+            <div className="bg-emerald-950/60 px-4 py-2 rounded-xl border border-emerald-500/30 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.15)] backdrop-blur-md">
+              <span className="text-emerald-100 font-bold tracking-wider">{player.gold}</span>
+              <Coins className="text-emerald-400" size={18} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 w-full mb-6 relative">
+            <svg width="40" height="10" viewBox="0 0 40 10" className="text-emerald-600/[0.4] opacity-70">
+              <path d="M0 5h15m-5-3l5 3-5 3m10-3h15M30 2l5 3-5 3" stroke="currentColor" strokeWidth="1" fill="none" />
+            </svg>
+            <span className="text-xs uppercase tracking-[0.2em] font-serif text-emerald-500/90 drop-shadow-md">Мои товары</span>
+            <svg width="40" height="10" viewBox="0 0 40 10" className="text-emerald-600/[0.4] opacity-70 rotate-180">
+              <path d="M0 5h15m-5-3l5 3-5 3m10-3h15M30 2l5 3-5 3" stroke="currentColor" strokeWidth="1" fill="none" />
+            </svg>
+          </div>
+
+          <div className="space-y-4 pb-6 px-1">
+            {/* Egg Item */}
+            <div className="relative p-3 bg-[#0B0E14]/60 backdrop-blur-sm border border-emerald-500/20 rounded-2xl flex gap-4 shadow-lg hover:border-emerald-500/40 transition-colors group">
+              <div className="absolute top-3 right-3 text-emerald-500/40">
+                <Bookmark size={18} />
+              </div>
+              
+              <div className="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-emerald-950/30 border border-white/5 relative">
+                {/* Fallback pattern for egg */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-800/30 via-emerald-950/50 to-black"></div>
+                <div className="absolute inset-0 flex items-center justify-center text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">🥚</div>
+              </div>
+              
+              <div className="flex flex-col flex-1 min-w-0 py-1">
+                <h4 className="text-base font-bold text-emerald-50 max-w-[85%] font-serif">Таинственное Яйцо</h4>
+                <p className="text-[11px] text-slate-400 mt-1 leading-snug">Случайный питомец.<br/>Старый исчезнет!</p>
+                
+                <div className="mt-auto flex items-center justify-between gap-3 pt-2">
+                  <div className="flex-1">
+                    <button 
+                      onClick={() => {
+                        if (player.gold >= 200) {
+                          const types = ['Дракон', 'Волк', 'Грифон', 'Феникс', 'Слайм', 'Фея', 'Энт', 'Василиск'];
+                          const type = types[Math.floor(Math.random() * types.length)];
+                          const rarityRoll = Math.random();
+                          let rarity: 'common' | 'rare' | 'epic' | 'legendary' = 'common';
+                          if (rarityRoll > 0.95) rarity = 'legendary';
+                          else if (rarityRoll > 0.8) rarity = 'epic';
+                          else if (rarityRoll > 0.5) rarity = 'rare';
+
+                          const newPet: Familiar = {
+                            name: `Яйцо (${type})`,
+                            type,
+                            rarity,
+                            stage: 'egg',
+                            status: 'active',
+                            xp: 0,
+                            level: 1
+                          };
+                          setPlayer(prev => ({ ...prev, gold: prev.gold - 200, familiar: newPet }));
+                          import('./lib/sfx').then(({ playSound }) => playSound('coin'));
+                          setShowBeastNode(false);
+                        }
+                      }}
+                      disabled={player.gold < 200}
+                      className="w-full py-2 bg-transparent hover:bg-emerald-900/30 text-emerald-300 disabled:opacity-50 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all disabled:hover:bg-transparent"
+                    >
+                      Купить
+                    </button>
+                  </div>
+                  <div className="bg-emerald-900/40 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                    <span className="text-emerald-100 font-bold text-sm">200</span>
+                    <Coins size={14} className="text-emerald-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Food Item */}
+            <div className="relative p-3 bg-[#0B0E14]/60 backdrop-blur-sm border border-emerald-500/20 rounded-2xl flex gap-4 shadow-lg hover:border-emerald-500/40 transition-colors group">
+              <div className="absolute top-3 right-3 text-emerald-500/40">
+                <Bookmark size={18} />
+              </div>
+              
+              <div className="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-emerald-950/30 border border-white/5 relative">
+                {/* Fallback pattern for food */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-800/20 via-emerald-950/50 to-black"></div>
+                <div className="absolute inset-0 flex items-center justify-center text-5xl drop-shadow-[0_0_15px_rgba(245,158,11,0.3)]">🍖</div>
+              </div>
+              
+              <div className="flex flex-col flex-1 min-w-0 py-1">
+                <h4 className="text-base font-bold text-emerald-50 max-w-[85%] font-serif">Питательный Корм</h4>
+                <p className="text-[11px] text-slate-400 mt-1 leading-snug">Воскрешает питомца.</p>
+                
+                <div className="mt-auto flex items-center justify-between gap-3 pt-2">
+                  <div className="flex-1">
+                    <button 
+                      onClick={() => {
+                        if (player.gold >= 50 && player.familiar) {
+                          setPlayer(prev => ({ 
+                            ...prev, 
+                            gold: prev.gold - 50, 
+                            familiar: prev.familiar ? { ...prev.familiar, status: 'active', injuredUntil: undefined } : undefined 
+                          }));
+                          import('./lib/sfx').then(({ playSound }) => playSound('coin'));
+                          setShowBeastNode(false);
+                        }
+                      }}
+                      disabled={player.gold < 50 || !player.familiar || player.familiar.status !== 'injured'}
+                      className="w-full py-2 bg-transparent hover:bg-emerald-900/30 text-emerald-300 disabled:opacity-50 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all disabled:hover:bg-transparent"
+                    >
+                      Купить
+                    </button>
+                  </div>
+                  <div className="bg-emerald-900/40 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                    <span className="text-emerald-100 font-bold text-sm">50</span>
+                    <Coins size={14} className="text-emerald-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="pt-6 text-center flex flex-col items-center">
+               <svg width="100" height="15" viewBox="0 0 100 15" className="text-emerald-600/[0.3] mb-4">
+                 <path d="M0 7.5L40 7.5M60 7.5L100 7.5M45 7.5L50 2L55 7.5L50 13L45 7.5Z" stroke="currentColor" strokeWidth="1" fill="none" />
+               </svg>
+               <p className="text-[12px] text-slate-400/80 italic font-serif leading-relaxed max-w-[200px]">
+                 Забочусь о зверях с любовью.<br/>Выбирай лучшее для своего друга.
+               </p>
+            </div>
+          </div>
+        </NPCModal>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {activeEvent && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => setActiveEvent(null)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-[#1A1D24] border-2 border-red-900/50 rounded-2xl shadow-[0_0_50px_rgba(220,38,38,0.15)] overflow-hidden flex flex-col"
+            >
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-rose-500 to-red-900" />
+              <div className="absolute top-0 right-0 p-4">
+                <button onClick={() => setActiveEvent(null)} className="text-slate-500 hover:text-slate-300">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-6 pb-2 text-center flex flex-col items-center">
+                <div className="w-16 h-16 rounded-full bg-red-950/50 border border-red-500/30 flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                  <Flame size={32} className="text-red-500 animate-pulse" />
+                </div>
+                <h2 className="text-xl font-black text-rose-100 uppercase tracking-widest drop-shadow-md mb-2">
+                  Случайное Событие
+                </h2>
+                <div className="w-12 h-0.5 bg-red-500/30 rounded-full mb-4" />
+              </div>
+              
+              <div className="px-6 pb-6 space-y-4">
+                <p className="text-[13px] text-slate-300 leading-relaxed font-serif italic text-center">
+                  "{activeEvent.description}"
+                </p>
+                <div className="bg-red-950/20 border border-red-900/30 rounded-xl p-4 flex flex-col items-center text-center">
+                  <span className="text-[10px] uppercase font-bold text-red-400 mb-1 tracking-wider">Ваша задача</span>
+                  <p className="text-[14px] font-bold text-rose-50">
+                    {activeEvent.taskPrompt}
+                  </p>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setPlayer(prev => ({...prev, gold: prev.gold + (activeEvent.rewardGold || 10)}));
+                    setGameState(prev => ({...prev, events: prev.events?.filter(e => e.id !== activeEvent.id)}));
+                    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                    setActiveEvent(null);
+                  }}
+                  className="w-full py-3.5 bg-gradient-to-r from-red-900 to-rose-900 hover:from-red-800 hover:to-rose-800 text-rose-50 font-black tracking-wider uppercase text-sm rounded-xl border border-red-500/50 shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <CheckCircle size={18} />
+                  Миссия Выполнена <span className="opacity-70">(+{activeEvent.rewardGold || 10} <Coins size={12} className="inline-block" />)</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

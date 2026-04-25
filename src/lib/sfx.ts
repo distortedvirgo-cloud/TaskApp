@@ -1,4 +1,4 @@
-export const playSound = (type: 'ding' | 'coin' | 'slash') => {
+export const playSound = (type: 'ding' | 'coin' | 'slash' | 'error' | 'powerup') => {
   try {
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContext) return;
@@ -29,6 +29,25 @@ export const playSound = (type: 'ding' | 'coin' | 'slash') => {
       gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
       osc.start(now);
       osc.stop(now + 0.4);
+    } else if (type === 'error') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.3, now + 0.1);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } else if (type === 'powerup') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+      osc.frequency.exponentialRampToValueAtTime(1760, now + 0.4);
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.3, now + 0.1);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+      osc.start(now);
+      osc.stop(now + 0.5);
     } else if (type === 'slash') {
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(150, now);
