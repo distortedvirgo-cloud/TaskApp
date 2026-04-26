@@ -453,6 +453,61 @@ export const evaluateTaskWithAI = async (apiKey: string, baseUrl: string, model:
   }
 };
 
+export const regenerateAITown = async (
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  seasonInfo: import('../App').HeroChronicle['season_info']
+) => {
+  const openai = getOpenAIClient(apiKey, baseUrl);
+  const systemPrompt = `You are a Game Master in a dark fantasy RPG. 
+  The player is currently in Season (Story Arc): "${seasonInfo?.name || 'Unknown'}".
+  Season Lore: "${seasonInfo?.setting_lore || 'Unknown'}".
+
+  CRITICAL: You need to regenerate the City/Camp (the player's safe haven) and its 5 NPCs.
+  CITY RESTRICTIONS:
+  - DIVERSITY: Generate a random and balanced mix of genders and races (women, men, elves, dwarves, orcs, tieflings, beastfolk, etc.). Minimum 50% of characters MUST be female. 
+  - For each NPC, explicitly declare their \`gender\` (Male/Female) and \`race\` (Human, Elf, Dwarf, Tiefling, Orc, Beastfolk), and inject these into their \`imagePrompt\`.
+  - COZY ATMOSPHERE: The city is a safe haven. NPCs MUST NOT be toxic, condescending, arrogant, or humiliating. 
+  - TONE OF VOICE И СТИЛИСТИКА ТЕКСТА (ВАЖНО):
+    1. Используй качественный, живой литературный русский язык в стиле хорошего фэнтези (как в играх серии Ведьмак, Dragon Age или Baldur's Gate).
+    2. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ англицизмы и геймерский сленг в речи персонажей. НЕ используй слова: скилл, левел, квест, рандомный, босс, апгрейд. Заменяй их на внутриигровые аналоги: навык, умение, ступень, поручение, задача, чудовище, враг, улучшение.
+    3. Текст должен быть естественным и легко читаться. Избегай громоздких деепричастных оборотов, излишней поэтичности и театрального пафоса.
+    4. Строй фразы по правилам русского синтаксиса, избегай прямого калькирования английских конструкций.
+    5. Реплики NPC должны быть лаконичными (1-2 предложения), атмосферными, но привязанными к бытовым реалиям Лагеря. (e.g. "Присаживайся у огня, путник. Мои зелья согреют даже в самую темную ночь").
+
+  NPC Roles:
+  1. shop (Black market or cozy trader)
+  2. fortune (A diviner, seer, or oracle)
+  3. altar (A mystical shrine spirit or priest)
+  4. beast (A friendly beastmaster or familiar breeder)
+  5. expedition (Guild master or scout leader)
+  
+  For each NPC, provide a very specific \`imagePrompt\` that MUST exactly follow this template: "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [gender] [race] [profession]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [LOCATION IN ENGLISH]. Masterpiece, NO messy brushstrokes, NO hyper-realism." NO UI elements, NO text.
+
+  Return your response as a JSON object matching this structure EXACTLY:
+  {
+    "city_background_prompt": "A short English prompt for an AI image generator to create a top-down dark fantasy settlement/camp map for this season. Stylized concept art, high detail, no UI, no text.",
+    "npcs": {
+      "shop": { "name": "...", "quote": "...", "imagePrompt": "..." },
+      "fortune": { "name": "...", "quote": "...", "imagePrompt": "..." },
+      "altar": { "name": "...", "quote": "...", "imagePrompt": "..." },
+      "beast": { "name": "...", "quote": "...", "imagePrompt": "..." },
+      "expedition": { "name": "...", "quote": "...", "imagePrompt": "..." }
+    }
+  }`;
+
+  const response = await openai.chat.completions.create({
+    model: model || 'gpt-4o-mini',
+    messages: [{ role: 'system', content: systemPrompt }],
+    response_format: { type: 'json_object' }
+  });
+
+  const content = response.choices?.[0]?.message?.content;
+  if (!content) throw new Error("Пустой ответ от OpenAI");
+  return extractJSON(content);
+};
+
 export const generateAICampaign = async (
   apiKey: string, 
   baseUrl: string, 
@@ -494,13 +549,26 @@ export const generateAICampaign = async (
       CRITICAL: You are generating the FIRST campaign of a NEW Season (Story Arc).
       A Season lasts between 2 and 4 campaigns (weeks).
       You MUST generate a global season setting/biome.
-      Also generate 5 NPCs for the city/camp, adapted to the dark fantasy lore of this season:
-      1. shop (Black market trader)
-      2. fortune (A diviner, blind seer, or oracle)
-      3. altar (A demonic or ancient shrine avatar)
-      4. beast (A beastmaster or familiar breeder)
+      Also generate 5 NPCs for the city/camp (a safe haven for the player).
+      CITY RESTRICTIONS:
+      - DIVERSITY: Generate a random and balanced mix of genders and races (women, men, elves, dwarves, orcs, tieflings, beastfolk, etc.). Minimum 50% of characters MUST be female. 
+      - For each NPC, explicitly declare their \`gender\` (Male/Female) and \`race\` (Human, Elf, Dwarf, Tiefling, Orc, Beastfolk), and inject these into their \`imagePrompt\`.
+      - COZY ATMOSPHERE: The city is a safe haven. NPCs MUST NOT be toxic, condescending, arrogant, or humiliating. 
+      - TONE OF VOICE И СТИЛИСТИКА ТЕКСТА (ВАЖНО):
+        1. Используй качественный, живой литературный русский язык в стиле хорошего фэнтези (как в играх серии Ведьмак, Dragon Age или Baldur's Gate).
+        2. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ англицизмы и геймерский сленг в речи персонажей. НЕ используй слова: скилл, левел, квест, рандомный, босс, апгрейд. Заменяй их на внутриигровые аналоги: навык, умение, ступень, поручение, задача, чудовище, враг, улучшение.
+        3. Текст должен быть естественным и легко читаться. Избегай громоздких деепричастных оборотов, излишней поэтичности и театрального пафоса.
+        4. Строй фразы по правилам русского синтаксиса, избегай прямого калькирования английских конструкций.
+        5. Реплики NPC должны быть лаконичными (1-2 предложения), атмосферными, но привязанными к бытовым реалиям Лагеря. (e.g. "Присаживайся у огня, путник. Мои зелья согреют даже в самую темную ночь").
+
+      NPC Roles:
+      1. shop (Black market or cozy trader)
+      2. fortune (A diviner, seer, or oracle)
+      3. altar (A mystical shrine spirit or priest)
+      4. beast (A friendly beastmaster or familiar breeder)
       5. expedition (Guild master or scout leader)
-      For each NPC, provide a very specific \`imagePrompt\` that MUST start with: "High quality vertical portrait of a [type] looking directly at the viewer, dark fantasy game art, detailed atmospheric lighting. Minimal background. NO UI, NO TEXT."
+      
+      For each NPC, provide a very specific \`imagePrompt\` that MUST exactly follow this template: "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [gender] [race] [profession]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [LOCATION IN ENGLISH]. Masterpiece, NO messy brushstrokes, NO hyper-realism." NO UI elements, NO text.
       Return "season_info" in your JSON response with the new season's name, lore, total campaigns (2 to 4), and set current_campaign to 1. Ensure you include the 'npcs' object.
       `;
     } else if (chronicle?.season_info) {
@@ -517,6 +585,12 @@ export const generateAICampaign = async (
 
     const systemPrompt = `You are a Game Master in an RPG habit tracker.
     Create a weekly campaign. The player will face 2-3 mini-bosses (minions) over the week, leading up to a main boss.
+    
+    TONE OF VOICE И СТИЛИСТИКА ТЕКСТА (ВАЖНО):
+    1. Используй качественный, живой литературный русский язык в стиле хорошего фэнтези (Ведьмак, Dragon Age, Baldur's Gate).
+    2. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ англицизмы и геймерский сленг. НЕ используй: скилл, левел, квест, рандомный, босс, апгрейд. Заменяй их на: навык, умение, ступень, поручение, задача, чудовище, враг, улучшение.
+    3. Текст должен быть естественным, избегай театрального пафоса и деепричастных оборотов.
+
     ${seasonContext}
     ${nemesisPrompt}
     ${chronicleContext}
@@ -553,7 +627,7 @@ export const generateAICampaign = async (
         {
           "name": "Mini-boss Name (in Russian)",
           "description": "Description of the mini-boss in Russian.",
-          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this mini-boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
+          "imagePrompt": "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [ENEMY DESCRIPTION]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [FITTING ATMOSPHERIC BACKGROUND]. Masterpiece, NO messy brushstrokes, NO hyper-realism. NO UI elements, NO text.",
           "avatarEmoji": "🐺",
           "isMiniBoss": true,
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
@@ -578,7 +652,7 @@ export const generateAICampaign = async (
         {
           "name": "Main Boss Name (in Russian)",
           "description": "Epic description of the main boss in Russian.",
-          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this main boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
+          "imagePrompt": "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [ENEMY DESCRIPTION]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [FITTING ATMOSPHERIC BACKGROUND]. Masterpiece, NO messy brushstrokes, NO hyper-realism. NO UI elements, NO text.",
           "avatarEmoji": "🐉",
           "isMiniBoss": false,
           "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
@@ -737,8 +811,7 @@ export const generateAIImage = async (apiKey: string, baseUrl: string, model: st
       model: model || "dall-e-3",
       prompt: prompt,
       n: 1,
-      size: "1024x1024", // Ignored by Gemini wrapper, used as fallback for real OpenAI
-      aspectRatio: aspectRatio, // Passed to Gemini wrapper
+      size: (aspectRatio === "9:16" || aspectRatio === "3:4") ? "1024x1792" : (aspectRatio === "16:9" ? "1792x1024" : "1024x1024"), // Adjusted for vertical/horizontal format when needed
       response_format: "b64_json",
       // @ts-ignore - nano-gpt specific parameters
       guidance_scale: 7.5,

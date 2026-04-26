@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sword, CheckCircle, Circle, Plus, Trash2, Trophy, Skull, User, Flame, Target, Shield, Book, Heart, Zap, Clock, AlertCircle, Settings, Bot, X, Loader2, RefreshCw, AlertTriangle, Download, HelpCircle, ChevronUp, ChevronDown, ChevronRight, Eye, ShoppingBag, Coins, Map, Store, Tent, Dna, Compass, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics } from './lib/ai';
+import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics, regenerateAITown } from './lib/ai';
 import { NPCModal } from './components/NPCModal';
 
 export type StatType = 'strength' | 'intelligence' | 'charisma' | 'willpower' | 'unknown';
@@ -1880,6 +1880,66 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     }
   };
 
+  const handleRegenerateTown = async () => {
+    if (!effectiveApiKey && !effectiveAiBaseUrl) {
+      setGmMessage("Пожалуйста, укажите API ключ или Base URL в настройках.");
+      return;
+    }
+    if (!gameState.chronicle?.season_info) {
+        setGmMessage("Никакой сезон/город еще не сгенерирован.");
+        return;
+    }
+    
+    setIsGeneratingTasks(true);
+    setGmMessage("Генерируем новых NPC и город, ожидайте...");
+    
+    try {
+        const townData = await regenerateAITown(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, gameState.chronicle.season_info);
+        
+        let npcsRaw: Record<string, any> = {};
+        if (townData && townData.npcs) {
+           npcsRaw = townData.npcs;
+        }
+
+        const npcsList = Object.entries(npcsRaw);
+        for (const [key, npc] of npcsList) {
+            console.log(`[Game] Requesting new image for NPC: ${npc.name}`);
+            if (npc.imagePrompt) {
+               const img = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "9:16");
+               npc.imageUrl = img || undefined;
+            }
+        }
+
+        let cityImageUrl: string | undefined = undefined;
+        if (townData && townData.city_background_prompt) {
+            console.log(`[Game] Requesting new image for City`);
+            const cityImg = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", townData.city_background_prompt, aiSettings.enableImages, "9:16");
+            cityImageUrl = cityImg || undefined;
+        }
+
+        setGameState(prev => {
+            const updatedChronicle = { ...prev.chronicle };
+            if (updatedChronicle.season_info) {
+               updatedChronicle.season_info.npcs = npcsRaw as any;
+               if (townData.city_background_prompt) {
+                  updatedChronicle.season_info.city_background_prompt = townData.city_background_prompt;
+               }
+               if (cityImageUrl) {
+                  updatedChronicle.season_info.city_background_url = cityImageUrl;
+               }
+            }
+            return { ...prev, chronicle: updatedChronicle as import('./App').HeroChronicle };
+        });
+
+        setGmMessage("Город и NPC успешно обновлены!");
+    } catch (e: any) {
+        console.error("Town regeneration failed", e);
+        setGmMessage(`Ошибка при генерации города: ${e.message || "Неизвестная ошибка"}`);
+    } finally {
+        setIsGeneratingTasks(false);
+    }
+  };
+
   const handleEnemyClick = (enemy: Boss, idx: number) => {
     if (!campaign) return;
     
@@ -2407,6 +2467,18 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         >
                           <Skull size={14} />
                           Оставить боссу 1 HP
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setShowSettings(false);
+                            handleRegenerateTown();
+                          }}
+                          disabled={isGeneratingTasks}
+                          className="w-full py-2 bg-[#0B0E14] hover:bg-white/5 text-emerald-400 text-xs rounded-lg transition-colors border border-white/5 flex items-center justify-center gap-2"
+                        >
+                          {isGeneratingTasks ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                          Пересоздать город и NPC
                         </button>
 
                         <button
@@ -2987,7 +3059,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                               <motion.img 
                                 src={boss.imageUrl} 
                                 alt={boss.name} 
-                                className="w-full h-full object-cover opacity-80" 
+                                className="w-full h-full object-cover object-[right_top] opacity-80" 
                                 referrerPolicy="no-referrer"
                                 animate={bossHit ? {
                                   filter: ['brightness(1) contrast(1)', 'brightness(1.5) contrast(1.2)', 'brightness(1) contrast(1)'],
@@ -3420,35 +3492,80 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                 <button onClick={() => setShowShopNode(true)} className="w-14 h-14 rounded-full bg-black/80 backdrop-blur-md border-[2px] border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] flex items-center justify-center mb-1 animate-[pulse_2s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
                    <Skull className="text-purple-400" size={24} />
                 </button>
-                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/60 px-2 py-0.5 rounded-full border border-purple-500/30 relative z-10">Теневой Рынок</span>
+                <div className="flex flex-col items-center bg-black/60 px-3 py-1 rounded-lg border border-purple-500/30 relative z-10">
+                  <span className="text-[11px] font-serif uppercase tracking-widest text-[#E2E8F0] drop-shadow-md whitespace-nowrap">
+                    {gameState.chronicle?.season_info?.npcs?.shop?.name || "Теневой Рынок"}
+                  </span>
+                  {gameState.chronicle?.season_info?.npcs?.shop?.name && gameState.chronicle?.season_info?.npcs?.shop?.name !== "Теневой Рынок" && (
+                    <span className="text-[8px] font-sans font-medium text-purple-400/80 uppercase tracking-wider drop-shadow-md whitespace-nowrap mt-0.5">
+                      Теневой Рынок
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '65%', left: '75%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
                 <button onClick={() => setShowExpeditionNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.6)] flex items-center justify-center mb-1 z-10 transition-transform active:scale-95 hover:bg-blue-500/20">
                    <Compass className="text-blue-400" size={24} />
                 </button>
-                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Экспедиции</span>
+                <div className="flex flex-col items-center bg-black/60 px-3 py-1 rounded-lg border border-white/10 relative z-10">
+                  <span className="text-[11px] font-serif uppercase tracking-widest text-[#E2E8F0] drop-shadow-md whitespace-nowrap">
+                    {gameState.chronicle?.season_info?.npcs?.expedition?.name || "Экспедиции"}
+                  </span>
+                  {gameState.chronicle?.season_info?.npcs?.expedition?.name && gameState.chronicle?.season_info?.npcs?.expedition?.name !== "Экспедиции" && (
+                    <span className="text-[8px] font-sans font-medium text-blue-400/80 uppercase tracking-wider drop-shadow-md whitespace-nowrap mt-0.5">
+                      Гильдия Питомцев
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '30%', left: '60%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
                 <button onClick={() => setShowFortuneTellerNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.6)] flex items-center justify-center mb-1 animate-[pulse_3s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
                    <Eye className="text-fuchsia-400" size={24} />
                 </button>
-                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Слепая Гадалка</span>
+                <div className="flex flex-col items-center bg-black/60 px-3 py-1 rounded-lg border border-white/10 relative z-10">
+                  <span className="text-[11px] font-serif uppercase tracking-widest text-[#E2E8F0] drop-shadow-md whitespace-nowrap">
+                    {gameState.chronicle?.season_info?.npcs?.fortune?.name || "Слепая Гадалка"}
+                  </span>
+                  {gameState.chronicle?.season_info?.npcs?.fortune?.name && gameState.chronicle?.season_info?.npcs?.fortune?.name !== "Слепая Гадалка" && (
+                    <span className="text-[8px] font-sans font-medium text-fuchsia-400/80 uppercase tracking-wider drop-shadow-md whitespace-nowrap mt-0.5">
+                      Слепая Гадалка
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '15%', left: '50%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
                 <button onClick={() => setShowAltarNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.6)] flex items-center justify-center mb-1 animate-[pulse_4s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
                    <Flame className="text-rose-400" size={24} />
                 </button>
-                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Алтарь Клятв</span>
+                <div className="flex flex-col items-center bg-black/60 px-3 py-1 rounded-lg border border-white/10 relative z-10">
+                  <span className="text-[11px] font-serif uppercase tracking-widest text-[#E2E8F0] drop-shadow-md whitespace-nowrap">
+                    {gameState.chronicle?.season_info?.npcs?.altar?.name || "Алтарь Клятв"}
+                  </span>
+                  {gameState.chronicle?.season_info?.npcs?.altar?.name && gameState.chronicle?.season_info?.npcs?.altar?.name !== "Алтарь Клятв" && (
+                    <span className="text-[8px] font-sans font-medium text-rose-400/80 uppercase tracking-wider drop-shadow-md whitespace-nowrap mt-0.5">
+                      Алтарь Клятв
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 opacity-100 transition-opacity" style={{ top: '50%', left: '20%', opacity: (gameState.events && gameState.events.length >= 5) ? 0.3 : 1, pointerEvents: (gameState.events && gameState.events.length >= 5) ? 'none' : 'auto' }}>
                 <button onClick={() => setShowBeastNode(true)} className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-md border-[2px] border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.6)] flex items-center justify-center mb-1 animate-[pulse_2.5s_ease-in-out_infinite] z-10 transition-transform active:scale-95">
                    <Dna className="text-emerald-400" size={24} />
                 </button>
-                <span className="text-[10px] font-bold text-slate-300 drop-shadow-md whitespace-nowrap bg-black/40 px-2 py-0.5 rounded-full border border-white/10 relative z-10">Торговка Зверьем</span>
+                <div className="flex flex-col items-center bg-black/60 px-3 py-1 rounded-lg border border-white/10 relative z-10">
+                  <span className="text-[11px] font-serif uppercase tracking-widest text-[#E2E8F0] drop-shadow-md whitespace-nowrap">
+                    {gameState.chronicle?.season_info?.npcs?.beast?.name || "Торговка Зверьем"}
+                  </span>
+                  {gameState.chronicle?.season_info?.npcs?.beast?.name && gameState.chronicle?.season_info?.npcs?.beast?.name !== "Торговка Зверьем" && (
+                    <span className="text-[8px] font-sans font-medium text-emerald-400/80 uppercase tracking-wider drop-shadow-md whitespace-nowrap mt-0.5">
+                      Торговка Зверьем
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -3502,70 +3619,76 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           onClose={() => setShowExpeditionNode(false)}
           npcId="expedition"
           fallbackName="Гильдия Питомцев"
+          overrideName="ГИЛЬДИЯ ПИТОМЦЕВ"
           fallbackQuote="Отправь своего зверя в дикие земли. Но помни: чем больше ты тренируешься сегодня, тем выше его шансы выжить."
           themeColor="blue"
           gameState={gameState}
+          leftAlignHeader={true}
         >
-          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
-            <div className="h-px bg-white/20 flex-1"></div>
-            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Опасные Земли</span>
-            <div className="h-px bg-white/20 flex-1"></div>
+          <div className="flex items-center justify-center gap-3 w-[70%] md:w-[60%] mx-auto mb-8 mt-4">
+            <div className="flex-1 h-[1px] bg-blue-500/20 text-center"></div>
+            <span className="text-[10px] text-blue-500/60 font-serif">♦</span>
+            <span className="text-[10px] font-serif uppercase tracking-[3px] text-blue-500 whitespace-nowrap">Опасные Земли</span>
+            <span className="text-[10px] text-blue-500/60 font-serif">♦</span>
+            <div className="flex-1 h-[1px] bg-blue-500/20"></div>
           </div>
 
-          {!player.familiar || player.familiar.stage === 'egg' ? (
-            <div className="mt-2 p-6 bg-black/40 border border-blue-500/20 rounded-xl text-center shadow-md pb-6">
-              <p className="text-blue-400/50 text-sm italic">Вырасти зверя, прежде чем отправлять его в дикие земли.</p>
-            </div>
-          ) : player.familiar.status === 'injured' ? (
-            <div className="mt-2 p-6 bg-red-950/40 border border-red-500/30 rounded-xl text-center shadow-md pb-6">
-              <p className="text-red-400 text-sm italic">Твой питомец тяжело ранен. Единение с природой подождет. Отнеси его к Торговке Зверьем за Кормом.</p>
-            </div>
-          ) : (
-            <div className="mt-2 space-y-4 pb-6">
-              <div className="flex items-center justify-between p-4 bg-black/40 border border-blue-500/20 rounded-xl shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-900/40 border border-blue-500/30 flex items-center justify-center text-xl">
-                    🐾
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-300">{player.familiar.name} <span className="text-[10px] text-blue-500">({player.familiar.type})</span></h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Шанс успеха миссии: <span className="text-white font-bold">{Math.round(Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95) * 100)}%</span></p>
+          <div className="px-6 pb-10 w-full max-w-sm mx-auto">
+            {!player.familiar || player.familiar.stage === 'egg' ? (
+              <div className="p-6 bg-black/40 backdrop-blur-md border border-blue-500/20 rounded-xl text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                <p className="text-blue-400/50 text-sm italic font-serif">Вырасти зверя, прежде чем отправлять его в дикие земли.</p>
+              </div>
+            ) : player.familiar.status === 'injured' ? (
+              <div className="p-6 bg-red-950/20 backdrop-blur-md border border-red-500/30 rounded-xl text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                <p className="text-red-400 text-sm italic font-serif">Твой питомец тяжело ранен. Единение с природой подождет. Отнеси его к Торговке Зверьем за Кормом.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="p-5 bg-black/40 backdrop-blur-md border border-blue-500/20 rounded-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-xl bg-blue-900/30 border border-blue-500/20 flex items-center justify-center shadow-inner shrink-0">
+                      <span className="text-3xl filter drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">🐾</span>
+                    </div>
+                    <div>
+                      <h4 className="text-lg font-normal text-slate-100 font-serif tracking-wider">{player.familiar.name} <span className="text-xs text-blue-500/80 font-sans tracking-normal uppercase">({player.familiar.type})</span></h4>
+                      <p className="text-[12px] text-slate-400/80 mt-1 italic font-serif opacity-80">Шанс успеха миссии: <span className="text-blue-300 font-bold ml-1 not-italic">{Math.round(Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95) * 100)}%</span></p>
+                    </div>
                   </div>
                 </div>
+                
+                <button 
+                  onClick={() => {
+                    const successChance = Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95);
+                    const roll = Math.random();
+                    if (roll < successChance) {
+                      // Win
+                      const goldReward = Math.floor(Math.random() * 50) + 20;
+                      const xpReward = Math.floor(Math.random() * 30) + 10;
+                      setPlayer(prev => ({
+                        ...prev,
+                        gold: prev.gold + goldReward,
+                        familiar: prev.familiar ? { ...prev.familiar, xp: prev.familiar.xp + xpReward } : undefined
+                      }));
+                      setGmMessage(`Твой зверь вернулся с триумфом! Добыча: +${goldReward} золота, +${xpReward} опыта питомца.`);
+                      import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                    } else {
+                      // Lose
+                      setPlayer(prev => ({
+                        ...prev,
+                        familiar: { ...prev.familiar!, status: 'injured', injuredUntil: Date.now() + 7 * 24 * 60 * 60 * 1000 }
+                      }));
+                      setGmMessage('Катастрофа! Питомец был изранен дикими тварями. Он не может сражаться, пока не будет исцелен.');
+                      import('./lib/sfx').then(({ playSound }) => playSound('error'));
+                    }
+                    setShowExpeditionNode(false);
+                  }}
+                  className="w-full py-4 bg-transparent hover:bg-blue-500/5 text-blue-400 border border-blue-500/40 rounded-xl text-xs uppercase tracking-[3px] font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  Отправить в Пустоши
+                </button>
               </div>
-              
-              <button 
-                onClick={() => {
-                  const successChance = Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95);
-                  const roll = Math.random();
-                  if (roll < successChance) {
-                    // Win
-                    const goldReward = Math.floor(Math.random() * 50) + 20;
-                    const xpReward = Math.floor(Math.random() * 30) + 10;
-                    setPlayer(prev => ({
-                      ...prev,
-                      gold: prev.gold + goldReward,
-                      familiar: prev.familiar ? { ...prev.familiar, xp: prev.familiar.xp + xpReward } : undefined
-                    }));
-                    setGmMessage(`Твой зверь вернулся с триумфом! Добыча: +${goldReward} золота, +${xpReward} опыта питомца.`);
-                    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
-                  } else {
-                    // Lose
-                    setPlayer(prev => ({
-                      ...prev,
-                      familiar: { ...prev.familiar!, status: 'injured', injuredUntil: Date.now() + 7 * 24 * 60 * 60 * 1000 }
-                    }));
-                    setGmMessage('Катастрофа! Питомец был изранен дикими тварями. Он не может сражаться, пока не будет исцелен.');
-                    import('./lib/sfx').then(({ playSound }) => playSound('error'));
-                  }
-                  setShowExpeditionNode(false);
-                }}
-                className="w-full py-4 bg-[#0B0E14]/80 hover:bg-blue-900/40 text-blue-300 rounded-xl text-sm font-bold border border-blue-500/50 transition-all shadow-lg hover:scale-[1.02] flex items-center justify-center gap-2 uppercase tracking-wide"
-              >
-                Отправить в Пустоши
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </NPCModal>
       </AnimatePresence>
 
@@ -3575,93 +3698,101 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           onClose={() => setShowShopNode(false)}
           npcId="shop"
           fallbackName="Теневой Рынок"
+          overrideName="ТЕНЕВОЙ РЫНОК"
           fallbackQuote="Скрытые товары для тех, кто не задает лишних вопросов."
           themeColor="purple"
           gameState={gameState}
+          leftAlignHeader={true}
         >
           {/* Player Gold Header */}
-          <div className="w-full flex justify-end mb-4">
-            <div className="bg-purple-900/40 px-3 py-1.5 rounded-lg border border-purple-500/50 flex items-center gap-2 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
-              <span className="text-purple-300 font-bold text-sm">{player.gold}</span>
-              <Coins className="text-purple-400" size={16} />
+          <div className="absolute top-24 right-6 sm:top-20 z-30">
+            <div className="bg-[rgba(30,20,40,0.6)] backdrop-blur-lg px-4 py-2 rounded-2xl border border-purple-500/20 flex items-center gap-2 shadow-[0_4px_15px_rgba(0,0,0,0.4)]">
+              <span className="text-purple-100 font-bold tracking-[0.1em] font-serif">{player.gold}</span>
+              <Coins className="text-purple-400 filter drop-shadow-[0_0_5px_rgba(168,85,247,0.5)]" size={16} />
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
-            <div className="h-px bg-white/20 flex-1"></div>
-            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Мои товары</span>
-            <div className="h-px bg-white/20 flex-1"></div>
+          <div className="flex items-center justify-center gap-3 w-[70%] md:w-[60%] mx-auto mb-8 mt-4">
+            <div className="flex-1 h-[1px] bg-purple-500/20 text-center"></div>
+            <span className="text-[10px] text-purple-500/60 font-serif">♦</span>
+            <span className="text-[10px] font-serif uppercase tracking-[3px] text-purple-500 whitespace-nowrap">Мои товары</span>
+            <span className="text-[10px] text-purple-500/60 font-serif">♦</span>
+            <div className="flex-1 h-[1px] bg-purple-500/20"></div>
           </div>
 
           {/* Items List */}
-          <div className="space-y-3 pb-8">
+          <div className="flex flex-col gap-5 pb-10 px-6 w-full max-w-sm mx-auto">
             {gameState.shopItems.length === 0 ? (
-              <div className="bg-black/50 p-6 text-center rounded-xl border border-purple-500/20">
-                <p className="text-purple-400/50 text-sm italic">Товар распродан. Возвращайтесь завтра.</p>
+              <div className="p-6 bg-black/40 backdrop-blur-md border border-purple-500/20 rounded-xl text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                <p className="text-purple-400/50 text-sm italic font-serif">Товар распродан. Возвращайтесь завтра.</p>
               </div>
             ) : (
               gameState.shopItems.map((item, index) => (
-                <div key={`shop-${index}`} className="bg-black/40 backdrop-blur-sm p-4 flex gap-4 items-center rounded-xl border border-white/5 shadow-md">
-                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${
-                    item.rarity === 'gold' ? 'bg-amber-900/40 text-amber-400 border border-amber-500/30' :
-                    item.rarity === 'purple' ? 'bg-purple-900/40 text-purple-400 border border-purple-500/30' :
-                    item.rarity === 'blue' ? 'bg-blue-900/40 text-blue-400 border border-blue-500/30' :
-                    'bg-slate-900/40 text-slate-400 border border-slate-500/30'
+                <div key={`shop-${index}`} className="relative p-5 bg-black/40 backdrop-blur-md border border-purple-500/20 rounded-xl flex gap-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all duration-300 hover:border-purple-500/40 group overflow-hidden">
+                  <div className={`w-14 h-14 shrink-0 rounded-xl overflow-hidden relative flex items-center justify-center shadow-inner ${
+                    item.rarity === 'gold' ? 'bg-amber-900/30 border border-amber-500/20 text-amber-400' :
+                    item.rarity === 'purple' ? 'bg-purple-900/30 border border-purple-500/20 text-purple-400' :
+                    item.rarity === 'blue' ? 'bg-blue-900/30 border border-blue-500/20 text-blue-400' :
+                    'bg-slate-900/30 border border-slate-500/20 text-slate-400'
                   }`}>
-                    {item.effect.type === 'heal_boss' ? <Heart size={24} /> :
-                     item.effect.type === 'damage_boost' ? <Sword size={24} /> :
-                     item.effect.type === 'pet_food' ? <span className="text-2xl drop-shadow-md">🍖</span> :
-                     <Zap size={24} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className={`font-bold text-sm truncate ${
-                      item.rarity === 'gold' ? 'text-amber-400' :
-                      item.rarity === 'purple' ? 'text-purple-400' :
-                      item.rarity === 'blue' ? 'text-blue-400' :
-                      'text-slate-300'
-                    }`}>{item.name}</h4>
-                    <p className="text-xs text-slate-400 italic line-clamp-2 mt-0.5">{item.lore}</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (player.gold >= item.price) {
-                        setPlayer(prev => ({ ...prev, gold: prev.gold - item.price }));
-                        // Apply effect
-                        if (item.effect.type === 'heal_boss') {
-                          setBoss(prev => prev ? ({ ...prev, hp: Math.min(prev.maxHp, prev.hp + item.effect.value) }) : prev);
-                        } else if (item.effect.type === 'damage_boost') {
-                          setPlayer(prev => ({
-                            ...prev,
-                            pendingDamage: {
-                              ...prev.pendingDamage,
-                              strength: prev.pendingDamage.strength + item.effect.value
-                            }
-                          }));
-                        } else if (item.effect.type === 'xp_boost') {
-                          setPlayer(prev => ({ ...prev, xp: prev.xp + item.effect.value }));
-                        } else if (item.effect.type === 'pet_food') {
-                          feedFamiliar(item.effect.value);
-                        }
-                        // Remove item from shop
-                        setGameState(prev => ({
-                          ...prev,
-                          shopItems: prev.shopItems.filter((_, i) => i !== index)
-                        }));
-                        import('./lib/sfx').then(({ playSound }) => playSound('coin'));
-                      }
-                    }}
-                    disabled={player.gold < item.price}
-                    className={`px-4 py-2.5 rounded-lg text-sm font-bold flex flex-col items-center justify-center min-w-[70px] transition-all shadow-md ${
-                      player.gold >= item.price 
-                        ? 'bg-[#0B0E14]/80 text-purple-400 hover:bg-purple-900/40 border border-purple-500/50 hover:scale-105' 
-                        : 'bg-black/50 text-slate-600 border border-white/5'
-                    }`}
-                  >
-                    Купить
-                    <span className="flex items-center gap-1 text-xs opacity-80 font-normal mt-0.5">
-                      {item.price} <Coins size={10} />
+                    <span className="filter drop-shadow-[0_0_8px_rgba(168,85,247,0.5)] group-hover:scale-110 transition-transform duration-300">
+                      {item.effect.type === 'heal_boss' ? <Heart size={28} /> :
+                       item.effect.type === 'damage_boost' ? <Sword size={28} /> :
+                       item.effect.type === 'pet_food' ? <span className="text-3xl drop-shadow-md">🍖</span> :
+                       <Zap size={28} />}
                     </span>
-                  </button>
+                  </div>
+                  
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <h4 className={`text-base font-normal font-serif tracking-wider truncate mt-0.5 ${
+                      item.rarity === 'gold' ? 'text-amber-200' :
+                      item.rarity === 'purple' ? 'text-purple-200' :
+                      item.rarity === 'blue' ? 'text-blue-200' :
+                      'text-slate-200'
+                    }`}>{item.name}</h4>
+                    <p className="text-[11px] text-slate-400/80 mt-1 leading-relaxed italic font-serif opacity-80 overflow-hidden line-clamp-2">{item.lore}</p>
+                    
+                    <div className="mt-auto flex items-center justify-between pt-3">
+                      <div className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/20 rounded-full flex items-center gap-1">
+                        <span className="text-purple-400 font-light text-[11px] tracking-tighter">{item.price}</span>
+                        <Coins size={10} className="text-purple-500" />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          if (player.gold >= item.price) {
+                            setPlayer(prev => ({ ...prev, gold: prev.gold - item.price }));
+                            // Apply effect
+                            if (item.effect.type === 'heal_boss') {
+                              setBoss(prev => prev ? ({ ...prev, hp: Math.min(prev.maxHp, prev.hp + item.effect.value) }) : prev);
+                            } else if (item.effect.type === 'damage_boost') {
+                              setPlayer(prev => ({
+                                ...prev,
+                                pendingDamage: {
+                                  ...prev.pendingDamage,
+                                  strength: prev.pendingDamage.strength + item.effect.value
+                                }
+                              }));
+                            } else if (item.effect.type === 'xp_boost') {
+                              setPlayer(prev => ({ ...prev, xp: prev.xp + item.effect.value }));
+                            } else if (item.effect.type === 'pet_food') {
+                              feedFamiliar(item.effect.value);
+                            }
+                            // Remove item from shop
+                            setGameState(prev => ({
+                              ...prev,
+                              shopItems: prev.shopItems.filter((_, i) => i !== index)
+                            }));
+                            import('./lib/sfx').then(({ playSound }) => playSound('coin'));
+                          }
+                        }}
+                        disabled={player.gold < item.price}
+                        className="px-4 py-1.5 bg-transparent hover:bg-purple-500/10 text-purple-400 disabled:opacity-20 border border-purple-500/40 rounded-[8px] text-[10px] uppercase tracking-[2px] transition-all active:scale-[0.98]"
+                      >
+                        Купить
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))
             )}
@@ -3673,46 +3804,59 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           onClose={() => setShowFortuneTellerNode(false)}
           npcId="fortune"
           fallbackName="Слепая Гадалка"
+          overrideName="СЛЕПАЯ ГАДАЛКА"
           fallbackQuote="Я не вижу лиц, но вижу судьбы. За золотую монету я покажу тебе путь в тумане."
           themeColor="fuchsia"
           gameState={gameState}
+          leftAlignHeader={true}
         >
           {/* Player Gold Header */}
-          <div className="w-full flex justify-end mb-4">
-            <div className="bg-fuchsia-900/40 px-3 py-1.5 rounded-lg border border-fuchsia-500/50 flex items-center gap-2 shadow-[0_0_10px_rgba(217,70,239,0.2)]">
-              <span className="text-fuchsia-300 font-bold text-sm">{player.gold}</span>
-              <Coins className="text-fuchsia-400" size={16} />
+          <div className="absolute top-24 right-6 sm:top-20 z-30">
+            <div className="bg-[rgba(40,20,40,0.6)] backdrop-blur-lg px-4 py-2 rounded-2xl border border-fuchsia-500/20 flex items-center gap-2 shadow-[0_4px_15px_rgba(0,0,0,0.4)]">
+              <span className="text-fuchsia-100 font-bold tracking-[0.1em] font-serif">{player.gold}</span>
+              <Coins className="text-fuchsia-400 filter drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]" size={16} />
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
-            <div className="h-px bg-white/20 flex-1"></div>
-            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Ритуал Прозрения</span>
-            <div className="h-px bg-white/20 flex-1"></div>
+          <div className="flex items-center justify-center gap-3 w-[70%] md:w-[60%] mx-auto mb-8 mt-4">
+            <div className="flex-1 h-[1px] bg-fuchsia-500/20 text-center"></div>
+            <span className="text-[10px] text-fuchsia-500/60 font-serif">♦</span>
+            <span className="text-[10px] font-serif uppercase tracking-[3px] text-fuchsia-500 whitespace-nowrap">Ритуал Прозрения</span>
+            <span className="text-[10px] text-fuchsia-500/60 font-serif">♦</span>
+            <div className="flex-1 h-[1px] bg-fuchsia-500/20"></div>
           </div>
 
-          <div className="bg-black/40 backdrop-blur-sm border border-fuchsia-500/20 rounded-xl p-6 text-left shadow-md">
-            <h4 className="text-fuchsia-300 font-bold mb-3 text-base flex items-center gap-2"><Target size={18} /> Совет Мастера</h4>
-            <p className="text-sm text-slate-400 mb-6 italic leading-relaxed">Гадалка заглянет в ваши текущие задачи и статистику, чтобы подсказать, на чем стоит сосредоточиться сегодня. Она видит то, что скрыто от ваших глаз.</p>
-            
-            <button
-              onClick={() => {
-                if (player.gold >= 100) {
-                  setPlayer(prev => ({ ...prev, gold: prev.gold - 100 }));
-                  setShowFortuneTellerNode(false);
-                  askMasterForAdvice();
-                  import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
-                } else {
-                  setGmMessage("У вас нет 100 золота. Духи требуют равноценный обмен.");
-                }
-              }}
-              disabled={isGeneratingTasks || player.gold < 100}
-              className="w-full py-4 bg-[#0B0E14]/80 hover:bg-fuchsia-900/40 text-fuchsia-300 text-sm font-bold rounded-lg transition-all border border-fuchsia-500/50 flex items-center justify-center gap-2 disabled:opacity-50 hover:scale-[1.02] shadow-lg"
-              >
-              {isGeneratingTasks ? <Loader2 size={18} className="animate-spin" /> : (
-                <>Получить Совет <span className="opacity-50 flex items-center ml-1">(100 <Coins size={12} className="ml-0.5" />)</span></>
-              )}
-            </button>
+          <div className="px-6 pb-10 w-full max-w-sm mx-auto">
+            <div className="bg-black/40 backdrop-blur-md border border-fuchsia-500/20 rounded-xl p-6 text-left shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+              <div className="flex items-center gap-4 mb-4">
+                 <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden relative flex items-center justify-center shadow-inner bg-fuchsia-900/30 border border-fuchsia-500/20">
+                    <span className="text-3xl filter drop-shadow-[0_0_8px_rgba(217,70,239,0.5)]">👁️</span>
+                 </div>
+                 <div>
+                   <h4 className="text-lg font-normal text-fuchsia-200 font-serif tracking-wider">Совет Мастера</h4>
+                 </div>
+              </div>
+              <p className="text-[12px] text-slate-400/80 mb-6 italic leading-relaxed font-serif opacity-80">Гадалка заглянет в ваши текущие задачи и статистику, чтобы подсказать, на чем стоит сосредоточиться сегодня. Она видит то, что скрыто от ваших глаз.</p>
+              
+              <button
+                onClick={() => {
+                  if (player.gold >= 100) {
+                    setPlayer(prev => ({ ...prev, gold: prev.gold - 100 }));
+                    setShowFortuneTellerNode(false);
+                    askMasterForAdvice();
+                    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                  } else {
+                    setGmMessage("У вас нет 100 золота. Духи требуют равноценный обмен.");
+                  }
+                }}
+                disabled={isGeneratingTasks || player.gold < 100}
+                className="w-full py-4 bg-transparent hover:bg-fuchsia-500/5 text-fuchsia-400 border border-fuchsia-500/40 rounded-xl text-xs uppercase tracking-[3px] font-bold transition-all disabled:opacity-50 active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                {isGeneratingTasks ? <Loader2 size={18} className="animate-spin" /> : (
+                  <>Получить Совет <span className="opacity-50 flex items-center ml-1 text-[10px] tracking-normal font-sans font-light">(100 <Coins size={10} className="ml-0.5" />)</span></>
+                )}
+              </button>
+            </div>
           </div>
         </NPCModal>
 
@@ -3721,12 +3865,34 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           onClose={() => setShowAltarNode(false)}
           npcId="altar"
           fallbackName="Алтарь Клятв"
+          overrideName="АЛТАРЬ КЛЯТВ"
           fallbackQuote="Слова — ветер, но клятва крови вечна. Чего ты желаешь достичь?"
           themeColor="rose"
           gameState={gameState}
-          footer={
-            !gameState.altarTask || gameState.altarTask.status !== 'active' ? (
-              <div className="flex flex-col gap-3 w-full pt-1">
+          leftAlignHeader={true}
+        >
+          <div className="flex items-center justify-center gap-3 w-[70%] md:w-[60%] mx-auto mb-8 mt-4">
+            <div className="flex-1 h-[1px] bg-rose-500/20 text-center"></div>
+            <span className="text-[10px] text-rose-500/60 font-serif">♦</span>
+            <span className="text-[10px] font-serif uppercase tracking-[3px] text-rose-500 whitespace-nowrap">Кровавый Договор</span>
+            <span className="text-[10px] text-rose-500/60 font-serif">♦</span>
+            <div className="flex-1 h-[1px] bg-rose-500/20"></div>
+          </div>
+
+          <div className="px-6 pb-10 w-full max-w-sm mx-auto">
+            {!gameState.altarTask || gameState.altarTask.status !== 'active' ? (
+              <div className="space-y-4">
+                <p className="text-slate-400/80 text-[12px] leading-relaxed italic font-serif opacity-80 border border-rose-500/20 bg-black/40 backdrop-blur-md p-4 rounded-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                  «Поклянись завершить великое дело до конца недели. Если страж сочтет задачу достойной, ты получишь могущественное благословение. Осторожно: нарушишь клятву, наказание будет жестоким.»
+                </p>
+                
+                <textarea
+                  value={oathInput}
+                  onChange={(e) => setOathInput(e.target.value)}
+                  placeholder="Я клянусь..."
+                  className="w-full bg-black/40 backdrop-blur-md border border-rose-500/30 rounded-xl p-4 text-slate-200 placeholder-rose-900/50 focus:outline-none focus:border-rose-400 focus:shadow-[0_0_15px_rgba(244,63,94,0.3)] resize-none h-28 text-sm transition-all shadow-inner font-serif"
+                />
+
                 <button 
                   onClick={async () => {
                     if (!oathInput.trim() || !effectiveApiKey) {
@@ -3762,86 +3928,64 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                     }
                   }}
                   disabled={isEvaluatingOath || !oathInput.trim()}
-                  className="w-full py-4 bg-rose-900/40 hover:bg-rose-900/60 text-rose-300 rounded-xl text-sm font-bold border border-rose-500/50 transition-all shadow-md disabled:opacity-50 hover:scale-[1.02] flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-transparent hover:bg-rose-500/5 text-rose-400 border border-rose-500/40 rounded-xl text-xs uppercase tracking-[3px] font-bold transition-all disabled:opacity-50 active:scale-[0.98] flex items-center justify-center gap-2"
                 >
                   {isEvaluatingOath ? <Loader2 size={18} className="animate-spin" /> : <><Flame size={16} /> Принести Клятву</>}
                 </button>
-                <button onClick={() => setShowAltarNode(false)} className="mx-auto text-slate-400 hover:text-slate-200 text-xs text-center border-b border-transparent hover:border-slate-500 transition-all font-serif">
-                  Отойти от алтаря
-                </button>
               </div>
-            ) : null
-          }
-        >
-          <div className="flex items-center gap-3 w-full mb-4 opacity-50 relative">
-            <div className="h-px bg-white/20 flex-1"></div>
-            <span className="text-xs uppercase tracking-widest font-serif text-white/80">Кровавый Договор</span>
-            <div className="h-px bg-white/20 flex-1"></div>
+            ) : (
+              <div className="bg-black/40 backdrop-blur-md border border-rose-500/20 p-5 rounded-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                <div className="flex flex-col gap-4">
+                  <h4 className="text-rose-400 font-normal font-serif tracking-wider flex items-center gap-2 text-lg">
+                    <Shield size={18} className="text-rose-500" /> Текущая Клятва
+                  </h4>
+                  <p className="text-sm font-serif text-slate-200/90 leading-relaxed italic border border-rose-500/10 bg-rose-950/20 p-3 rounded-lg line-clamp-4">
+                    «{gameState.altarTask.description}»
+                  </p>
+                  
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                        setPlayer(prev => ({
+                          ...prev,
+                          gold: gameState.altarTask!.rewardType === 'gold' ? prev.gold + (gameState.altarTask!.rewardValue as number) : prev.gold,
+                          xp: gameState.altarTask!.rewardType === 'xp' ? prev.xp + (gameState.altarTask!.rewardValue as number) : prev.xp
+                        }));
+                        setGameState(prev => ({
+                          ...prev,
+                          altarTask: { ...prev.altarTask!, status: 'completed' }
+                        }));
+                        setGmMessage("Ты исполнил клятву. Награда твоя.");
+                        setShowAltarNode(false);
+                      }}
+                      className="flex-1 py-3 bg-transparent hover:bg-emerald-500/5 text-emerald-400 rounded-xl text-[10px] uppercase tracking-widest font-bold border border-emerald-500/40 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-1"
+                    >
+                      <CheckCircle size={14} className="mb-0.5" />
+                      Исполнено
+                    </button>
+                    <button 
+                      onClick={() => {
+                        import('./lib/sfx').then(({ playSound }) => playSound('error'));
+                        setPlayer(prev => ({ ...prev, xp: Math.max(0, prev.xp - 100), gold: Math.max(0, prev.gold - 50) }));
+                        setGameState(prev => ({ ...prev, altarTask: { ...prev.altarTask!, status: 'failed' } }));
+                        setGmMessage("Клятва нарушена... Боги проклинают тебя (-100 XP, -50 Золота)");
+                        setShowAltarNode(false);
+                      }}
+                      className="flex-1 py-3 bg-transparent hover:bg-rose-500/5 text-rose-400 rounded-xl text-[10px] uppercase tracking-widest font-bold border border-rose-500/40 transition-all active:scale-[0.98] flex flex-col items-center justify-center gap-1"
+                    >
+                      <X size={14} className="mb-0.5" />
+                      Провалено
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-center text-slate-500 mt-2 opacity-80 flex items-center justify-center gap-1 uppercase tracking-widest font-serif">
+                    <Clock size={10} /> 
+                    Осталось дней: {Math.ceil((gameState.altarTask.deadline - Date.now()) / (1000 * 60 * 60 * 24))}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-
-          {!gameState.altarTask || gameState.altarTask.status !== 'active' ? (
-            <div className="space-y-4 pb-2">
-              <p className="text-slate-400 text-sm leading-relaxed italic border border-rose-500/20 bg-black/40 p-4 rounded-xl">
-                «Поклянись завершить великое дело до конца недели. Если страж сочтет задачу достойной, ты получишь могущественное благословение. Осторожно: нарушишь клятву, наказание будет жестоким.»
-              </p>
-              
-              <textarea
-                value={oathInput}
-                onChange={(e) => setOathInput(e.target.value)}
-                placeholder="Я клянусь..."
-                className="w-full bg-[#0B0E14]/80 backdrop-blur-md border border-rose-500/50 rounded-xl p-4 text-slate-200 placeholder-rose-900/50 focus:outline-none focus:border-rose-400 focus:shadow-[0_0_15px_rgba(244,63,94,0.3)] resize-none h-28 text-sm transition-all"
-              />
-            </div>
-          ) : (
-            <div className="bg-rose-950/20 border border-rose-500/30 p-5 rounded-xl mt-2 text-left shadow-inner mb-6">
-              <h4 className="text-rose-400 font-bold mb-3 flex items-center gap-2">
-                <Shield size={18} className="text-rose-500" /> Текущая Клятва
-              </h4>
-              <p className="text-sm font-serif text-slate-200 mb-4 bg-[#0B0E14]/80 p-3 rounded-lg border border-white/5 line-clamp-3">
-                «{gameState.altarTask.description}»
-              </p>
-              
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => {
-                    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
-                    setPlayer(prev => ({
-                      ...prev,
-                      gold: gameState.altarTask!.rewardType === 'gold' ? prev.gold + (gameState.altarTask!.rewardValue as number) : prev.gold,
-                      xp: gameState.altarTask!.rewardType === 'xp' ? prev.xp + (gameState.altarTask!.rewardValue as number) : prev.xp
-                    }));
-                    setGameState(prev => ({
-                      ...prev,
-                      altarTask: { ...prev.altarTask!, status: 'completed' }
-                    }));
-                    setGmMessage("Ты исполнил клятву. Награда твоя.");
-                    setShowAltarNode(false);
-                  }}
-                  className="flex-1 py-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl text-sm font-bold border border-emerald-500/30 transition-all hover:scale-105"
-                >
-                  <CheckCircle size={18} className="mx-auto mb-1" />
-                  Исполнено
-                </button>
-                <button 
-                  onClick={() => {
-                    import('./lib/sfx').then(({ playSound }) => playSound('error'));
-                    setPlayer(prev => ({ ...prev, xp: Math.max(0, prev.xp - 100), gold: Math.max(0, prev.gold - 50) }));
-                    setGameState(prev => ({ ...prev, altarTask: { ...prev.altarTask!, status: 'failed' } }));
-                    setGmMessage("Клятва нарушена... Боги проклинают тебя (-100 XP, -50 Золота)");
-                    setShowAltarNode(false);
-                  }}
-                  className="flex-1 py-3 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-xl text-sm font-bold border border-rose-500/30 transition-all hover:scale-105"
-                >
-                  <X size={18} className="mx-auto mb-1" />
-                  Провалено
-                </button>
-              </div>
-              <p className="text-[10px] text-center text-slate-500 mt-4 opacity-70 flex items-center justify-center gap-1">
-                <Clock size={10} /> 
-                {Math.ceil((gameState.altarTask.deadline - Date.now()) / (1000 * 60 * 60 * 24))} дней осталось
-              </p>
-            </div>
-          )}
         </NPCModal>
 
         <NPCModal
@@ -3853,150 +3997,118 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           fallbackQuote="Тебе нужен верный спутник? Или еда для него? У меня есть все."
           themeColor="emerald"
           gameState={gameState}
-          footer={
-            <div className="flex items-center justify-between gap-2 w-full pt-2">
-              <button className="flex-1 py-3 px-2 bg-emerald-900/30 hover:bg-emerald-900/50 rounded-xl border border-emerald-500/20 text-emerald-400 text-xs font-bold transition-colors flex items-center justify-center gap-1.5">
-                <Store size={14} />
-                Магазин
-              </button>
-              <button className="flex-1 py-3 px-2 bg-transparent hover:bg-white/5 rounded-xl border border-white/5 text-slate-400 hover:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5">
-                 <span className="text-lg leading-none">🐾</span>
-                Мои звери
-              </button>
-              <button className="flex-1 py-3 px-2 bg-transparent hover:bg-white/5 rounded-xl border border-white/5 text-slate-400 hover:text-slate-200 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 relative">
-                <Bookmark size={14} className="rotate-90 -translate-x-0.5" />
-                Сделки дня
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              </button>
-            </div>
-          }
+          leftAlignHeader={true}
         >
           {/* Player Gold Header */}
           <div className="absolute top-24 right-6 sm:top-20 z-30">
-            <div className="bg-emerald-950/60 px-4 py-2 rounded-xl border border-emerald-500/30 flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.15)] backdrop-blur-md">
-              <span className="text-emerald-100 font-bold tracking-wider">{player.gold}</span>
-              <Coins className="text-emerald-400" size={18} />
+            <div className="bg-[rgba(20,30,25,0.6)] backdrop-blur-lg px-4 py-2 rounded-2xl border border-emerald-500/20 flex items-center gap-2 shadow-[0_4px_15px_rgba(0,0,0,0.4)]">
+              <span className="text-emerald-100 font-bold tracking-[0.1em] font-serif">{player.gold}</span>
+              <Coins className="text-emerald-400 filter drop-shadow-[0_0_5px_rgba(16,185,129,0.5)]" size={16} />
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-3 w-full mb-6 relative">
-            <svg width="40" height="10" viewBox="0 0 40 10" className="text-emerald-600/[0.4] opacity-70">
-              <path d="M0 5h15m-5-3l5 3-5 3m10-3h15M30 2l5 3-5 3" stroke="currentColor" strokeWidth="1" fill="none" />
-            </svg>
-            <span className="text-xs uppercase tracking-[0.2em] font-serif text-emerald-500/90 drop-shadow-md">Мои товары</span>
-            <svg width="40" height="10" viewBox="0 0 40 10" className="text-emerald-600/[0.4] opacity-70 rotate-180">
-              <path d="M0 5h15m-5-3l5 3-5 3m10-3h15M30 2l5 3-5 3" stroke="currentColor" strokeWidth="1" fill="none" />
-            </svg>
+          <div className="flex items-center justify-center gap-3 w-[70%] md:w-[60%] mx-auto mb-8 mt-4">
+            <div className="flex-1 h-[1px] bg-emerald-500/20 text-center"></div>
+            <span className="text-[10px] text-emerald-500/60 font-serif">♦</span>
+            <span className="text-[10px] font-serif uppercase tracking-[3px] text-emerald-500 whitespace-nowrap">Мои товары</span>
+            <span className="text-[10px] text-emerald-500/60 font-serif">♦</span>
+            <div className="flex-1 h-[1px] bg-emerald-500/20"></div>
           </div>
 
-          <div className="space-y-4 pb-6 px-1">
+          <div className="flex flex-col gap-5 pb-10 px-1 w-full max-w-sm mx-auto">
             {/* Egg Item */}
-            <div className="relative p-3 bg-[#0B0E14]/60 backdrop-blur-sm border border-emerald-500/20 rounded-2xl flex gap-4 shadow-lg hover:border-emerald-500/40 transition-colors group">
-              <div className="absolute top-3 right-3 text-emerald-500/40">
-                <Bookmark size={18} />
+            <div className="relative p-5 bg-black/40 backdrop-blur-md border border-emerald-500/20 rounded-xl flex gap-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all duration-500 hover:border-emerald-500/40 group overflow-hidden">
+               <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-emerald-900/30 border border-emerald-500/20 relative flex items-center justify-center shadow-inner">
+                <span className="text-3xl filter drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] group-hover:scale-110 transition-transform duration-300">🥚</span>
               </div>
               
-              <div className="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-emerald-950/30 border border-white/5 relative">
-                {/* Fallback pattern for egg */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-800/30 via-emerald-950/50 to-black"></div>
-                <div className="absolute inset-0 flex items-center justify-center text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">🥚</div>
-              </div>
-              
-              <div className="flex flex-col flex-1 min-w-0 py-1">
-                <h4 className="text-base font-bold text-emerald-50 max-w-[85%] font-serif">Таинственное Яйцо</h4>
-                <p className="text-[11px] text-slate-400 mt-1 leading-snug">Случайный питомец.<br/>Старый исчезнет!</p>
-                
-                <div className="mt-auto flex items-center justify-between gap-3 pt-2">
-                  <div className="flex-1">
-                    <button 
-                      onClick={() => {
-                        if (player.gold >= 200) {
-                          const types = ['Дракон', 'Волк', 'Грифон', 'Феникс', 'Слайм', 'Фея', 'Энт', 'Василиск'];
-                          const type = types[Math.floor(Math.random() * types.length)];
-                          const rarityRoll = Math.random();
-                          let rarity: 'common' | 'rare' | 'epic' | 'legendary' = 'common';
-                          if (rarityRoll > 0.95) rarity = 'legendary';
-                          else if (rarityRoll > 0.8) rarity = 'epic';
-                          else if (rarityRoll > 0.5) rarity = 'rare';
+              <div className="flex flex-col flex-1 min-w-0">
+                <h4 className="text-lg font-normal text-slate-100 font-serif tracking-wider">Таинственное Яйцо</h4>
+                <p className="text-[12px] text-slate-400/80 mt-1 leading-relaxed italic font-serif">Случайный питомец из древних преданий. Предыдущий исчезнет навеки.</p>
+                <div className="mt-auto flex items-center justify-between pt-4">
+                   <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center gap-1.5">
+                    <span className="text-emerald-400 font-light text-xs tracking-tighter">200</span>
+                    <Coins size={12} className="text-emerald-500" />
+                  </div>
+                  
+                  <button 
+                    onClick={() => {
+                      if (player.gold >= 200) {
+                        const types = ['Дракон', 'Волк', 'Грифон', 'Феникс', 'Слайм', 'Фея', 'Энт', 'Василиск'];
+                        const type = types[Math.floor(Math.random() * types.length)];
+                        const rarityRoll = Math.random();
+                        let rarity: 'common' | 'rare' | 'epic' | 'legendary' = 'common';
+                        if (rarityRoll > 0.95) rarity = 'legendary';
+                        else if (rarityRoll > 0.8) rarity = 'epic';
+                        else if (rarityRoll > 0.5) rarity = 'rare';
 
-                          const newPet: Familiar = {
-                            name: `Яйцо (${type})`,
-                            type,
-                            rarity,
-                            stage: 'egg',
-                            status: 'active',
-                            xp: 0,
-                            level: 1
-                          };
-                          setPlayer(prev => ({ ...prev, gold: prev.gold - 200, familiar: newPet }));
-                          import('./lib/sfx').then(({ playSound }) => playSound('coin'));
-                          setShowBeastNode(false);
-                        }
-                      }}
-                      disabled={player.gold < 200}
-                      className="w-full py-2 bg-transparent hover:bg-emerald-900/30 text-emerald-300 disabled:opacity-50 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all disabled:hover:bg-transparent"
-                    >
-                      Купить
-                    </button>
-                  </div>
-                  <div className="bg-emerald-900/40 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                    <span className="text-emerald-100 font-bold text-sm">200</span>
-                    <Coins size={14} className="text-emerald-400" />
-                  </div>
+                        const newPet: Familiar = {
+                          name: `Яйцо (${type})`,
+                          type,
+                          rarity,
+                          stage: 'egg',
+                          status: 'active',
+                          xp: 0,
+                          level: 1
+                        };
+                        setPlayer(prev => ({ ...prev, gold: prev.gold - 200, familiar: newPet }));
+                        import('./lib/sfx').then(({ playSound }) => playSound('coin'));
+                        setShowBeastNode(false);
+                      }
+                    }}
+                    disabled={player.gold < 200}
+                    className="px-6 py-1.5 bg-transparent hover:bg-emerald-500/5 text-emerald-500 disabled:opacity-20 border border-emerald-500/40 rounded-[8px] text-[11px] uppercase tracking-[2px] transition-all active:scale-[0.98]"
+                  >
+                    Купить
+                  </button>
                 </div>
               </div>
             </div>
 
             {/* Food Item */}
-            <div className="relative p-3 bg-[#0B0E14]/60 backdrop-blur-sm border border-emerald-500/20 rounded-2xl flex gap-4 shadow-lg hover:border-emerald-500/40 transition-colors group">
-              <div className="absolute top-3 right-3 text-emerald-500/40">
-                <Bookmark size={18} />
+            <div className="relative p-5 bg-black/40 backdrop-blur-md border border-emerald-500/20 rounded-xl flex gap-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] transition-all duration-500 hover:border-emerald-500/40 group overflow-hidden">
+               <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden bg-emerald-900/30 border border-emerald-500/20 relative flex items-center justify-center shadow-inner">
+                <span className="text-3xl filter drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] group-hover:scale-110 transition-transform duration-300">🍖</span>
               </div>
               
-              <div className="w-28 h-28 shrink-0 rounded-xl overflow-hidden bg-emerald-950/30 border border-white/5 relative">
-                {/* Fallback pattern for food */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-800/20 via-emerald-950/50 to-black"></div>
-                <div className="absolute inset-0 flex items-center justify-center text-5xl drop-shadow-[0_0_15px_rgba(245,158,11,0.3)]">🍖</div>
-              </div>
-              
-              <div className="flex flex-col flex-1 min-w-0 py-1">
-                <h4 className="text-base font-bold text-emerald-50 max-w-[85%] font-serif">Питательный Корм</h4>
-                <p className="text-[11px] text-slate-400 mt-1 leading-snug">Воскрешает питомца.</p>
-                
-                <div className="mt-auto flex items-center justify-between gap-3 pt-2">
-                  <div className="flex-1">
-                    <button 
-                      onClick={() => {
-                        if (player.gold >= 50 && player.familiar) {
-                          setPlayer(prev => ({ 
-                            ...prev, 
-                            gold: prev.gold - 50, 
-                            familiar: prev.familiar ? { ...prev.familiar, status: 'active', injuredUntil: undefined } : undefined 
-                          }));
-                          import('./lib/sfx').then(({ playSound }) => playSound('coin'));
-                          setShowBeastNode(false);
-                        }
-                      }}
-                      disabled={player.gold < 50 || !player.familiar || player.familiar.status !== 'injured'}
-                      className="w-full py-2 bg-transparent hover:bg-emerald-900/30 text-emerald-300 disabled:opacity-50 border border-emerald-500/30 rounded-xl text-xs font-bold transition-all disabled:hover:bg-transparent"
-                    >
-                      Купить
-                    </button>
+              <div className="flex flex-col flex-1 min-w-0">
+                <h4 className="text-lg font-normal text-slate-100 font-serif tracking-wider">Питательный Корм</h4>
+                <p className="text-[12px] text-slate-400/80 mt-1 leading-relaxed italic font-serif">Смесь из редких трав. Исцеляет раны и возвращает силы вашему зверю.</p>
+                <div className="mt-auto flex items-center justify-between pt-4">
+                  <div className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center gap-1.5">
+                    <span className="text-emerald-400 font-light text-xs tracking-tighter">50</span>
+                    <Coins size={12} className="text-emerald-500" />
                   </div>
-                  <div className="bg-emerald-900/40 border border-emerald-500/20 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
-                    <span className="text-emerald-100 font-bold text-sm">50</span>
-                    <Coins size={14} className="text-emerald-400" />
-                  </div>
+
+                  <button 
+                    onClick={() => {
+                      if (player.gold >= 50 && player.familiar) {
+                        setPlayer(prev => ({ 
+                          ...prev, 
+                          gold: prev.gold - 50, 
+                          familiar: prev.familiar ? { ...prev.familiar, status: 'active', injuredUntil: undefined } : undefined 
+                        }));
+                        import('./lib/sfx').then(({ playSound }) => playSound('coin'));
+                        setShowBeastNode(false);
+                      }
+                    }}
+                    disabled={player.gold < 50 || !player.familiar || player.familiar.status !== 'injured'}
+                    className="px-6 py-1.5 bg-transparent hover:bg-emerald-500/5 text-emerald-500 disabled:opacity-20 border border-emerald-500/40 rounded-[8px] text-[11px] uppercase tracking-[2px] transition-all active:scale-[0.98]"
+                  >
+                    Купить
+                  </button>
                 </div>
               </div>
             </div>
             
-            <div className="pt-6 text-center flex flex-col items-center">
-               <svg width="100" height="15" viewBox="0 0 100 15" className="text-emerald-600/[0.3] mb-4">
-                 <path d="M0 7.5L40 7.5M60 7.5L100 7.5M45 7.5L50 2L55 7.5L50 13L45 7.5Z" stroke="currentColor" strokeWidth="1" fill="none" />
-               </svg>
-               <p className="text-[12px] text-slate-400/80 italic font-serif leading-relaxed max-w-[200px]">
-                 Забочусь о зверях с любовью.<br/>Выбирай лучшее для своего друга.
+            <div className="pt-10 text-center flex flex-col items-center">
+               <div className="flex items-center w-32 mb-6 opacity-30">
+                 <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent to-emerald-500"></div>
+                 <div className="mx-2 text-[8px] text-emerald-500">♦</div>
+                 <div className="flex-1 h-[1px] bg-gradient-to-l from-transparent to-emerald-500"></div>
+               </div>
+               <p className="text-[13px] text-slate-400 italic font-serif leading-relaxed max-w-[260px] font-light">
+                 «Я забочусь о каждом существе, что попадает в мои руки. Выбирай мудро, путник, ибо связь со зверем — священна.»
                </p>
             </div>
           </div>

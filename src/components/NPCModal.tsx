@@ -13,6 +13,7 @@ interface NPCModalProps {
   gameState: any; // Using any for brevity here
   children: React.ReactNode;
   footer?: React.ReactNode;
+  leftAlignHeader?: boolean;
 }
 
 const THEMES = {
@@ -22,6 +23,11 @@ const THEMES = {
     border: 'border-purple-500/30',
     gradient: 'from-purple-950/0 via-[#0B0E14]/80 to-[#0B0E14]',
     iconColor: 'text-purple-500',
+    quoteColor: 'text-purple-200/60',
+    dividerLineFrom: 'from-transparent to-purple-500/20',
+    dividerLineTo: 'from-purple-500/20 to-transparent',
+    dividerDiamondBorder: 'border-purple-500/30',
+    dividerDiamondBg: 'bg-purple-500/50',
   },
   fuchsia: {
     bg: 'bg-fuchsia-950/90',
@@ -29,6 +35,11 @@ const THEMES = {
     border: 'border-fuchsia-500/30',
     gradient: 'from-fuchsia-950/0 via-[#0B0E14]/80 to-[#0B0E14]',
     iconColor: 'text-fuchsia-500',
+    quoteColor: 'text-fuchsia-200/60',
+    dividerLineFrom: 'from-transparent to-fuchsia-500/20',
+    dividerLineTo: 'from-fuchsia-500/20 to-transparent',
+    dividerDiamondBorder: 'border-fuchsia-500/30',
+    dividerDiamondBg: 'bg-fuchsia-500/50',
   },
   rose: {
     bg: 'bg-rose-950/90',
@@ -36,6 +47,11 @@ const THEMES = {
     border: 'border-rose-500/30',
     gradient: 'from-rose-950/0 via-[#0B0E14]/80 to-[#0B0E14]',
     iconColor: 'text-rose-500',
+    quoteColor: 'text-rose-200/60',
+    dividerLineFrom: 'from-transparent to-rose-500/20',
+    dividerLineTo: 'from-rose-500/20 to-transparent',
+    dividerDiamondBorder: 'border-rose-500/30',
+    dividerDiamondBg: 'bg-rose-500/50',
   },
   emerald: {
     bg: 'bg-emerald-950/90',
@@ -43,6 +59,11 @@ const THEMES = {
     border: 'border-emerald-500/30',
     gradient: 'from-emerald-950/0 via-[#0B0E14]/80 to-[#0B0E14]',
     iconColor: 'text-emerald-500',
+    quoteColor: 'text-emerald-200/50',
+    dividerLineFrom: 'from-transparent to-emerald-500/20',
+    dividerLineTo: 'from-emerald-500/20 to-transparent',
+    dividerDiamondBorder: 'border-emerald-500/30',
+    dividerDiamondBg: 'bg-emerald-500/50',
   },
   blue: {
     bg: 'bg-blue-950/90',
@@ -50,11 +71,16 @@ const THEMES = {
     border: 'border-blue-500/30',
     gradient: 'from-blue-950/0 via-[#0B0E14]/80 to-[#0B0E14]',
     iconColor: 'text-blue-500',
+    quoteColor: 'text-blue-200/60',
+    dividerLineFrom: 'from-transparent to-blue-500/20',
+    dividerLineTo: 'from-blue-500/20 to-transparent',
+    dividerDiamondBorder: 'border-blue-500/30',
+    dividerDiamondBg: 'bg-blue-500/50',
   }
 };
 
 export const NPCModal: React.FC<NPCModalProps> = ({ 
-  isOpen, onClose, npcId, fallbackName, fallbackQuote, overrideName, themeColor, gameState, children, footer
+  isOpen, onClose, npcId, fallbackName, fallbackQuote, overrideName, themeColor, gameState, children, footer, leftAlignHeader
 }) => {
   const t = THEMES[themeColor];
   
@@ -90,49 +116,52 @@ export const NPCModal: React.FC<NPCModalProps> = ({
                 <img 
                   src={imageUrl} 
                   alt={npcData.name} 
-                  className="w-full h-full object-cover object-top opacity-70"
+                  className="w-full h-full object-cover object-[100%_15%] opacity-85"
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-full h-full opacity-70 bg-[#0B0E14]" />
+                <div className="w-full h-full opacity-70 bg-[#050A0F]" />
               )}
-              <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-[#0B0E14]/80 to-[#0B0E14] z-10 pointer-events-none`} />
-              <div className={`absolute inset-0 bg-gradient-to-t ${t.gradient} z-10 pointer-events-none opacity-40`} />
+              {/* Refined Gradient requested by user */}
+              <div 
+                className="absolute inset-0 z-10 pointer-events-none" 
+                style={{ 
+                  background: 'linear-gradient(to bottom, transparent 0%, rgba(5,10,15,0.85) 40%, #050a0f 100%)' 
+                }} 
+              />
             </div>
 
             {/* Close Button */}
             <button 
               onClick={onClose} 
-              className={`absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors`}
+              className={`absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all hover:scale-110 active:scale-95`}
             >
               <X size={20} />
             </button>
 
             {/* Portrait Text Content */}
-            <div className="relative z-20 px-6 pt-[22vh] sm:pt-[18vh] flex-shrink-0 flex flex-col items-start w-[75%]">
-               {/* Top Decoration */}
-               <svg className={`mb-3 w-6 h-6 ${t.iconColor} opacity-70`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-               </svg>
-               
-               <h2 className={`text-[2rem] sm:text-4xl font-normal text-slate-100 tracking-widest font-serif uppercase leading-[1.1] drop-shadow-xl text-left`}>
-                 {displayName.split(' ').map((word: string, i: number) => (
-                   <React.Fragment key={i}>
-                     {word}
-                     {i !== displayName.split(' ').length - 1 && <br />}
-                   </React.Fragment>
-                 ))}
+            <div className={`relative z-20 pt-[25vh] sm:pt-[22vh] flex-shrink-0 flex flex-col ${leftAlignHeader ? 'items-start text-left max-w-[65%] pl-8' : 'items-center text-center px-6 w-full'}`}>
+               <h2 className={`text-[1.8rem] sm:text-4xl font-normal text-[#E2E8F0] tracking-[4px] font-serif uppercase leading-[1.1]`} style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}>
+                 {npcData.name}
                </h2>
                
-               {/* Bottom Decoration line */}
-               <div className="flex items-center w-full mt-3 mb-4 opacity-50">
-                 <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent to-white/50"></div>
-                 <div className="mx-2 w-1.5 h-1.5 rotate-45 bg-white/70"></div>
-                 <div className="flex-1 h-[1px] bg-gradient-to-l from-transparent to-white/50"></div>
+               {npcData.name !== (overrideName || fallbackName) && npcData.name !== fallbackName && (
+                 <div className={`mt-2 font-serif tracking-[2px] uppercase text-[12px] opacity-80 ${t.iconColor}`}>
+                   {overrideName || fallbackName}
+                 </div>
+               )}
+               
+               {/* Bottom Decoration line with diamond */}
+               <div className={`flex items-center w-[60%] mt-5 mb-4 opacity-70 ${leftAlignHeader ? 'ml-0' : 'mx-auto'}`}>
+                 <div className={`flex-1 h-[1px] bg-gradient-to-r ${t.dividerLineFrom}`}></div>
+                 <div className={`mx-2 w-2 h-2 rotate-45 border flex items-center justify-center ${t.dividerDiamondBorder}`}>
+                    <div className={`w-1 h-1 ${t.dividerDiamondBg}`}></div>
+                 </div>
+                 <div className={`flex-1 h-[1px] bg-gradient-to-l ${t.dividerLineTo}`}></div>
                </div>
                
-               <p className="text-slate-200/90 text-sm leading-relaxed italic font-serif text-left drop-shadow-md">
-                 "{npcData.quote}"
+               <p className={`${t.quoteColor} text-sm leading-relaxed italic font-serif drop-shadow-md font-light ${leftAlignHeader ? 'pl-0' : 'px-6'}`}>
+                 «{npcData.quote}»
                </p>
             </div>
 
