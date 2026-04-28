@@ -168,8 +168,9 @@ export type Familiar = {
   type: string;
   rarity?: 'common' | 'rare' | 'epic' | 'legendary';
   stage: 'egg' | 'baby' | 'evolved' | 'ultra';
-  status: 'active' | 'injured';
+  status: 'active' | 'injured' | 'expedition';
   injuredUntil?: number;
+  expeditionEndsAt?: number;
   imageUrl?: string;
   xp: number;
   level: number;
@@ -655,6 +656,36 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       import('./lib/sfx').then(({ playSound }) => playSound('error'));
     }
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (player.familiar?.status === 'expedition' && player.familiar.expeditionEndsAt && player.familiar.expeditionEndsAt <= Date.now()) {
+        const successChance = Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95);
+        const roll = Math.random();
+        if (roll < successChance) {
+          // Win
+          const goldReward = Math.floor(Math.random() * 50) + 20;
+          const xpReward = Math.floor(Math.random() * 30) + 10;
+          setPlayer(prev => ({
+            ...prev,
+            gold: prev.gold + goldReward,
+            familiar: prev.familiar ? { ...prev.familiar, status: 'active', expeditionEndsAt: undefined, xp: prev.familiar.xp + xpReward } : undefined
+          }));
+          setGmMessage(`Твой зверь вернулся с триумфом! Добыча: +${goldReward} золота, +${xpReward} опыта питомца.`);
+          import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+        } else {
+          // Lose
+          setPlayer(prev => ({
+            ...prev,
+            familiar: { ...prev.familiar!, status: 'injured', expeditionEndsAt: undefined, injuredUntil: Date.now() + 7 * 24 * 60 * 60 * 1000 }
+          }));
+          setGmMessage('Катастрофа! Питомец был изранен дикими тварями в экспедиции. Он возвращается еле живым и нуждается в покое.');
+          import('./lib/sfx').then(({ playSound }) => playSound('error'));
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [player.familiar]);
 
   useEffect(() => {
     safeStorageSet('questlog_ai_settings', JSON.stringify(aiSettings));
@@ -1632,7 +1663,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
              try {
                 if (npc.imagePrompt && !npc.imageUrl) {
                    console.log(`[Game] Requesting image for NPC: ${npc.name}`);
-                   npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "9:16") || undefined;
+                   npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "3:4") || undefined;
                 }
              } catch(err) {
                 console.error("NPC generation failed", err);
@@ -1708,7 +1739,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           shopItems: prev.shopItems.length > 0 ? prev.shopItems : initialShopItems,
           chronicle: {
             ...prev.chronicle,
-            season_info: aiCampaign.newSeasonInfo || prev.chronicle.season_info
+            season_info: aiCampaign.newSeasonInfo ? { ...prev.chronicle.season_info, ...aiCampaign.newSeasonInfo, npcs: aiCampaign.newSeasonInfo.npcs || prev.chronicle.season_info?.npcs, city_background_url: aiCampaign.newSeasonInfo.city_background_url || aiCampaign.newSeasonInfo.city_background_prompt ? aiCampaign.newSeasonInfo.city_background_url : prev.chronicle.season_info?.city_background_url, city_background_prompt: aiCampaign.newSeasonInfo.city_background_prompt || prev.chronicle.season_info?.city_background_prompt } : prev.chronicle.season_info
           }
         }));
       } catch (e: any) {
@@ -1807,7 +1838,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         for (const npc of npcsList) {
            try {
               if (npc.imagePrompt && !npc.imageUrl) {
-                 npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "9:16") || undefined;
+                 npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "3:4") || undefined;
               }
            } catch(err) {
               console.error("NPC generation failed", err);
@@ -1867,7 +1898,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         shopItems: prev.shopItems.length > 0 ? prev.shopItems : initialShopItems,
         chronicle: {
           ...prev.chronicle,
-          season_info: aiCampaign.newSeasonInfo || prev.chronicle.season_info
+          season_info: aiCampaign.newSeasonInfo ? { ...prev.chronicle.season_info, ...aiCampaign.newSeasonInfo, npcs: aiCampaign.newSeasonInfo.npcs || prev.chronicle.season_info?.npcs, city_background_url: aiCampaign.newSeasonInfo.city_background_url || aiCampaign.newSeasonInfo.city_background_prompt ? aiCampaign.newSeasonInfo.city_background_url : prev.chronicle.season_info?.city_background_url, city_background_prompt: aiCampaign.newSeasonInfo.city_background_prompt || prev.chronicle.season_info?.city_background_prompt } : prev.chronicle.season_info
         }
       }));
       setGmMessage("Я создал для тебя новую кампанию!");
@@ -1905,7 +1936,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         for (const [key, npc] of npcsList) {
             console.log(`[Game] Requesting new image for NPC: ${npc.name}`);
             if (npc.imagePrompt) {
-               const img = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "9:16");
+               const img = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "3:4");
                npc.imageUrl = img || undefined;
             }
         }
@@ -3259,72 +3290,117 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                   )}
 
                   {player.familiar && (
-                    <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex flex-col gap-3 text-left relative">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-14 h-14 rounded-full bg-[#0B0E14] border-2 flex items-center justify-center text-3xl overflow-hidden shrink-0 ${
-                          player.familiar.status === 'injured' ? 'border-red-500/50 grayscale shadow-[0_0_10px_rgba(239,68,68,0.3)]' :
-                          player.familiar.rarity === 'legendary' ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.5)]' :
-                          player.familiar.rarity === 'epic' ? 'border-purple-500/50 shadow-[0_0_10px_rgba(168,85,247,0.4)]' :
-                          player.familiar.rarity === 'rare' ? 'border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.3)]' :
-                          'border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                        }`}>
-                          {player.familiar.imageUrl ? (
-                            <img src={player.familiar.imageUrl} alt={player.familiar.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            player.familiar.stage === 'egg' ? '🥚' : 
-                            player.familiar.stage === 'baby' ? '🐣' : 
-                            player.familiar.stage === 'evolved' ? '🦅' : '🐉'
-                          )}
+                    <div className="mt-6 p-1 rounded-2xl bg-gradient-to-b from-[#1E293B] to-[#0B0E14] shadow-xl border border-white/5">
+                      <div className="p-4 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] rounded-xl flex flex-col gap-4 text-left relative overflow-hidden">
+                        
+                        {/* Decorative glow */}
+                        <div className={`absolute top-0 right-0 w-32 h-32 blur-3xl opacity-20 pointer-events-none rounded-full ${
+                          player.familiar.status === 'injured' ? 'bg-red-500' :
+                          player.familiar.stage === 'ultra' ? 'bg-amber-500' :
+                          player.familiar.stage === 'evolved' ? 'bg-purple-500' :
+                          'bg-emerald-500'
+                        }`} />
+
+                        <div className="flex flex-col items-center gap-4 relative z-10">
+                          <div className={`w-28 h-28 rounded-full bg-[#0B0E14] border-4 flex items-center justify-center text-5xl overflow-hidden shrink-0 transition-all duration-500 hover:scale-105 ${
+                            player.familiar.status === 'injured' ? 'border-red-500/50 grayscale shadow-[0_0_20px_rgba(239,68,68,0.3)]' :
+                            player.familiar.stage === 'ultra' ? 'border-amber-400/80 shadow-[0_0_25px_rgba(251,191,36,0.6)]' :
+                            player.familiar.stage === 'evolved' ? 'border-purple-500/80 shadow-[0_0_20px_rgba(168,85,247,0.5)]' :
+                            player.familiar.stage === 'baby' ? 'border-blue-500/80 shadow-[0_0_20px_rgba(59,130,246,0.4)]' :
+                            'border-slate-500/50 shadow-inner'
+                          }`}>
+                            {player.familiar.imageUrl ? (
+                              <img src={player.familiar.imageUrl} alt={player.familiar.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              player.familiar.stage === 'egg' ? '🥚' : 
+                              player.familiar.stage === 'baby' ? '🐣' : 
+                              player.familiar.stage === 'evolved' ? '🦅' : '🐉'
+                            )}
+                          </div>
+                          
+                          <div className="text-center w-full space-y-1">
+                            <h4 className={`text-xl font-black tracking-wide font-serif ${
+                                player.familiar.status === 'injured' ? 'text-red-400' :
+                                player.familiar.stage === 'ultra' ? 'text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]' :
+                                player.familiar.stage === 'evolved' ? 'text-purple-400' :
+                                player.familiar.stage === 'baby' ? 'text-blue-400' :
+                                'text-slate-300'
+                              }`}>
+                              {player.familiar.name}
+                            </h4>
+                            <p className="text-xs text-slate-400 font-medium uppercase tracking-[2px]">
+                              {player.familiar.type}
+                            </p>
+                            
+                            <div className="flex justify-center items-center gap-2 mt-2">
+                              <span className="text-[10px] bg-black/50 px-2 py-1 rounded-md border border-white/10 text-white font-mono">
+                                Ур. {player.familiar.level}
+                              </span>
+                              <span className={`text-[10px] px-2 py-1 rounded-md border text-white font-bold uppercase tracking-wider ${
+                                player.familiar.stage === 'ultra' ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' :
+                                player.familiar.stage === 'evolved' ? 'bg-purple-500/20 border-purple-500/50 text-purple-300' :
+                                player.familiar.stage === 'baby' ? 'bg-blue-500/20 border-blue-500/50 text-blue-300' :
+                                'bg-slate-500/20 border-slate-500/50 text-slate-300'
+                              }`}>
+                                {player.familiar.stage === 'ultra' ? 'Легенда' : player.familiar.stage === 'evolved' ? 'Взрослый' : player.familiar.stage === 'baby' ? 'Детёныш' : 'Яйцо'}
+                              </span>
+                              {player.familiar.status === 'injured' && (
+                                <span className="text-[10px] bg-red-500/20 px-2 py-1 rounded-md border border-red-500/50 text-red-400 font-bold uppercase tracking-wider animate-pulse">
+                                  Ранен
+                                </span>
+                              )}
+                              {player.familiar.status === 'expedition' && (
+                                <span className="text-[10px] bg-emerald-500/20 px-2 py-1 rounded-md border border-emerald-500/50 text-emerald-400 font-bold uppercase tracking-wider animate-pulse">
+                                  В экспедиции
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h4 className={`text-sm font-bold flex items-center gap-2 ${
-                              player.familiar.status === 'injured' ? 'text-red-400' :
-                              player.familiar.rarity === 'legendary' ? 'text-amber-400' :
-                              player.familiar.rarity === 'epic' ? 'text-purple-400' :
-                              player.familiar.rarity === 'rare' ? 'text-blue-400' :
-                              'text-emerald-400'
-                            }`}>
-                            {player.familiar.name}
-                            <span className="text-[10px] bg-black/50 px-1.5 py-0.5 rounded border border-white/10 text-white">
-                              Ур. {player.familiar.level}
-                            </span>
-                          </h4>
-                          <p className="text-xs text-slate-400">
-                            {player.familiar.type} 
-                            {player.familiar.status === 'injured' && <span className="text-red-400 font-bold ml-2">(Ранен)</span>}
-                          </p>
-                          {player.familiar.status === 'active' && player.familiar.stage !== 'egg' && (
-                            <span className="text-[10px] text-emerald-400 mt-1 block">
-                              Бафф: +{Math.round(getFamiliarBuff(player.combo, player.familiar) * 100)}% к урону
-                            </span>
-                          )}
-                          {player.familiar.stage === 'egg' && (
-                            <span className="text-[10px] text-amber-400 mt-1 block italic">Ожидает победы над Главным Боссом...</span>
-                          )}
-                        </div>
+
+                        {player.familiar.stage !== 'egg' && (
+                          <div className="mt-2 space-y-3 z-10 w-full px-2">
+                            <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Связь</div>
+                              <div className="text-right text-[11px] text-emerald-400 font-bold">
+                                Бафф: +{Math.round(getFamiliarBuff(player.combo, player.familiar) * 100)}%
+                              </div>
+                            </div>
+
+                            {/* Pet XP Bar */}
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex justify-between text-[10px] text-emerald-300/80 font-bold uppercase tracking-widest">
+                                <span>Опыт питомца</span>
+                                <span>{player.familiar.xp} / {player.familiar.level * 100}</span>
+                              </div>
+                              <div className="h-2 bg-[#0B0E14] rounded-full overflow-hidden shadow-inner border border-white/5 relative">
+                                <motion.div
+                                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 relative"
+                                  initial={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
+                                  animate={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
+                                  transition={{ type: 'spring', bounce: 0 }}
+                                />
+                              </div>
+                            </div>
+                            
+                            <div className="w-full mt-4 py-3 px-3 text-center bg-black/40 rounded-lg text-[10px] leading-relaxed text-slate-300 border border-white/5">
+                              {player.familiar.stage === 'baby' ? (
+                                <>Ваш юный компаньон постепенно крепнет благодаря добыче из экспедиций. <strong className="text-blue-400">На 10 уровне</strong> он эволюционирует в грозного спутника.</>
+                              ) : player.familiar.stage === 'evolved' ? (
+                                <>Питомец познал дикие пустоши и обрел могущество. <strong className="text-purple-400">На 25 уровне</strong> он достигнет своей совершенной, легендарной формы!</>
+                              ) : (
+                                <>Легендарное создание, внушающее трепет врагам. Ваш компаньон достиг вершины эволюции и теперь является хранителем вашей судьбы!</>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {player.familiar.stage === 'egg' && (
+                          <div className="mt-2 w-full text-center text-slate-400 text-xs italic z-10 p-3 bg-black/20 rounded-xl border border-white/5">
+                            Внутри этого таинственного яйца дремлет великая сила. Оно проклюнется, когда вы одолеете Главного Босса текущей локации!
+                          </div>
+                        )}
                       </div>
-                      
-                      {/* Pet XP Bar */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[9px] text-emerald-300/70 font-medium uppercase tracking-wider">
-                          <span>Опыт питомца</span>
-                          <span>{player.familiar.xp} / {player.familiar.level * 100}</span>
-                        </div>
-                        <div className="h-1.5 bg-[#0B0E14] rounded-full overflow-hidden shadow-inner border border-white/5 relative">
-                          <motion.div
-                            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 relative"
-                            initial={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
-                            animate={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
-                            transition={{ type: 'spring', bounce: 0 }}
-                          />
-                        </div>
-                      </div>
-                      
-                      {player.familiar.status === 'active' && player.familiar.stage !== 'egg' && (
-                        <div className="w-full mt-2 py-2 text-center text-emerald-400/50 rounded-lg text-xs font-medium border border-emerald-500/10 transition-colors shadow-sm italic cursor-not-allowed">
-                          Отправьте питомца в экспедицию через Гильдию Питомцев в Городе
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -3644,48 +3720,49 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="p-5 bg-black/40 backdrop-blur-md border border-blue-500/20 rounded-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-blue-900/30 border border-blue-500/20 flex items-center justify-center shadow-inner shrink-0">
-                      <span className="text-3xl filter drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">🐾</span>
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-normal text-slate-100 font-serif tracking-wider">{player.familiar.name} <span className="text-xs text-blue-500/80 font-sans tracking-normal uppercase">({player.familiar.type})</span></h4>
-                      <p className="text-[12px] text-slate-400/80 mt-1 italic font-serif opacity-80">Шанс успеха миссии: <span className="text-blue-300 font-bold ml-1 not-italic">{Math.round(Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95) * 100)}%</span></p>
-                    </div>
+                {player.familiar.status === 'expedition' ? (
+                  <div className="p-6 bg-blue-900/20 backdrop-blur-md border border-blue-500/30 rounded-xl text-center shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                    <p className="text-blue-300 text-sm italic font-serif">Питомец исследует дикие пустоши. Возвращение ожидается через некоторое время...</p>
+                    {player.familiar.expeditionEndsAt && (
+                      <p className="text-[10px] text-blue-400/60 mt-3 font-sans tracking-widest uppercase">
+                        В пути: {Math.max(0, Math.ceil((player.familiar.expeditionEndsAt - Date.now()) / (60 * 1000)))} минут
+                      </p>
+                    )}
                   </div>
-                </div>
-                
-                <button 
-                  onClick={() => {
-                    const successChance = Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95);
-                    const roll = Math.random();
-                    if (roll < successChance) {
-                      // Win
-                      const goldReward = Math.floor(Math.random() * 50) + 20;
-                      const xpReward = Math.floor(Math.random() * 30) + 10;
-                      setPlayer(prev => ({
-                        ...prev,
-                        gold: prev.gold + goldReward,
-                        familiar: prev.familiar ? { ...prev.familiar, xp: prev.familiar.xp + xpReward } : undefined
-                      }));
-                      setGmMessage(`Твой зверь вернулся с триумфом! Добыча: +${goldReward} золота, +${xpReward} опыта питомца.`);
-                      import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
-                    } else {
-                      // Lose
-                      setPlayer(prev => ({
-                        ...prev,
-                        familiar: { ...prev.familiar!, status: 'injured', injuredUntil: Date.now() + 7 * 24 * 60 * 60 * 1000 }
-                      }));
-                      setGmMessage('Катастрофа! Питомец был изранен дикими тварями. Он не может сражаться, пока не будет исцелен.');
-                      import('./lib/sfx').then(({ playSound }) => playSound('error'));
-                    }
-                    setShowExpeditionNode(false);
-                  }}
-                  className="w-full py-4 bg-transparent hover:bg-blue-500/5 text-blue-400 border border-blue-500/40 rounded-xl text-xs uppercase tracking-[3px] font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                >
-                  Отправить в Пустоши
-                </button>
+                ) : (
+                  <>
+                    <div className="p-5 bg-black/40 backdrop-blur-md border border-blue-500/20 rounded-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)]">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl bg-blue-900/30 border border-blue-500/20 flex items-center justify-center shadow-inner shrink-0 relative overflow-hidden">
+                          {player.familiar.imageUrl ? (
+                            <img src={player.familiar.imageUrl} alt={player.familiar.name} className="absolute inset-0 w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-3xl filter drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]">🐾</span>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-normal text-slate-100 font-serif tracking-wider">{player.familiar.name} <span className="text-xs text-blue-500/80 font-sans tracking-normal uppercase">({player.familiar.type})</span></h4>
+                          <p className="text-[12px] text-slate-400/80 mt-1 italic font-serif opacity-80">Шанс успеха миссии: <span className="text-blue-300 font-bold ml-1 not-italic">{Math.round(Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95) * 100)}%</span></p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => {
+                        setPlayer(prev => ({
+                          ...prev,
+                          familiar: { ...prev.familiar!, status: 'expedition', expeditionEndsAt: Date.now() + 4 * 60 * 60 * 1000 }
+                        }));
+                        setGmMessage('Питомец отправился в экспедицию. Он вернется через 4 часа с добычей... или ранениями.');
+                        import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                        setShowExpeditionNode(false);
+                      }}
+                      className="w-full py-4 bg-transparent hover:bg-blue-500/5 text-blue-400 border border-blue-500/40 rounded-xl text-xs uppercase tracking-[3px] font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                      Отправить в Пустоши
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

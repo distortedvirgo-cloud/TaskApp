@@ -176,17 +176,17 @@ export const generateFamiliar = async (
     let prompt = '';
     
     if (stage === 'baby') {
-      prompt = `Игрок класса "${playerClass}" заслужил фамильяра. 
-      Придумай вид существа (животное, дух, механизм и т.д.) и его имя. 
-      Верни ТОЛЬКО JSON в формате: {"type": "вид существа", "name": "имя существа", "imagePrompt": "A short English prompt for an AI image generator to create a portrait of this pet."}`;
+      prompt = `Игрок класса "${playerClass}" заслужил магического фамильяра. 
+      Придумай вид существа (фэнтезийное животное, дух, голем и т.д.) и его имя. 
+      Верни ТОЛЬКО JSON в формате: {"type": "вид существа", "name": "Имя", "imagePrompt": "Detailed English prompt for AI image generator. AAA game stylized digital painting of a cute but magical baby [creature description]. Hearthstone/Riot game art style, vibrant colors, cinematic lighting, fantasy companion. Clean stylized forms. Masterpiece."}`;
     } else if (stage === 'evolved') {
-      prompt = `Фамильяр игрока (вид: ${currentFamiliar?.type}, имя: ${currentFamiliar?.name}) эволюционирует. 
-      Придумай ему крутую приставку или измени вид на более сильный (например, Волк -> Огненный Волк). Имя оставь прежним.
-      Верни ТОЛЬКО JSON в формате: {"type": "новый вид существа", "name": "${currentFamiliar?.name}", "imagePrompt": "A short English prompt for an AI image generator to create a portrait of this evolved pet."}`;
+      prompt = `Фамильяр игрока (вид: ${currentFamiliar?.type}, имя: ${currentFamiliar?.name}) повзрослел и эволюционировал. 
+      Придумай ему более взрослую, грозную или грациозную форму (например, Волк -> Бронированный Волк-Страж). Имя оставь прежним.
+      Верни ТОЛЬКО JSON в формате: {"type": "новый вид существа", "name": "${currentFamiliar?.name}", "imagePrompt": "Detailed English prompt for AI image generator. AAA game stylized digital painting of an evolved, powerful [creature description]. Hearthstone/Riot game art style, vibrant colors, cinematic lighting, fantasy companion. Clean stylized forms. Masterpiece."}`;
     } else if (stage === 'ultra') {
-      prompt = `Фамильяр игрока (вид: ${currentFamiliar?.type}, имя: ${currentFamiliar?.name}) достигает идеальной, эпической формы. 
-      Сделай его вид легендарным. Имя оставь прежним.
-      Верни ТОЛЬКО JSON в формате: {"type": "эпический вид существа", "name": "${currentFamiliar?.name}", "imagePrompt": "A short English prompt for an AI image generator to create a portrait of this legendary pet."}`;
+      prompt = `Фамильяр игрока (вид: ${currentFamiliar?.type}, имя: ${currentFamiliar?.name}) достигает своей финальной, легендарной формы. 
+      Сделай его вид божественным, мифическим и невероятно эпичным. Имя оставь прежним.
+      Верни ТОЛЬКО JSON в формате: {"type": "эпический вид существа", "name": "${currentFamiliar?.name}", "imagePrompt": "Detailed English prompt for AI image generator. AAA game stylized digital painting of an epic, legendary mythic [creature description]. Hearthstone/Riot game art style, vibrant colors, cinematic lighting, ultimate fantasy companion, divine aura. Clean stylized forms. Masterpiece."}`;
     }
 
     const response = await openai.chat.completions.create({
@@ -483,7 +483,7 @@ export const regenerateAITown = async (
   4. beast (A friendly beastmaster or familiar breeder)
   5. expedition (Guild master or scout leader)
   
-  For each NPC, provide a very specific \`imagePrompt\` that MUST exactly follow this template: "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [gender] [race] [profession]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [LOCATION IN ENGLISH]. Masterpiece, NO messy brushstrokes, NO hyper-realism." NO UI elements, NO text.
+  For each NPC, provide a very specific \`imagePrompt\` that MUST exactly follow this template: "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of an eccentric, uniquely designed [gender] [race] [profession]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Highly distinctive, memorable dark-fantasy design with unique accessories, striking magical elements, or intricate exotic garments. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned on the right side of the canvas. The background is a rich, completely colored [LOCATION IN ENGLISH]. ABSOLUTELY NO WHITE BORDERS OR EMPTY WHITE SPACE. Waist-up portrait. Looking directly at the viewer with a friendly expression. Masterpiece, NO messy brushstrokes, NO hyper-realism." NO UI elements, NO text.
 
   Return your response as a JSON object matching this structure EXACTLY:
   {
@@ -568,7 +568,7 @@ export const generateAICampaign = async (
       4. beast (A friendly beastmaster or familiar breeder)
       5. expedition (Guild master or scout leader)
       
-      For each NPC, provide a very specific \`imagePrompt\` that MUST exactly follow this template: "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [gender] [race] [profession]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [LOCATION IN ENGLISH]. Masterpiece, NO messy brushstrokes, NO hyper-realism." NO UI elements, NO text.
+      For each NPC, provide a very specific \`imagePrompt\` that MUST exactly follow this template: "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of an eccentric, uniquely designed [gender] [race] [profession]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Highly distinctive, memorable dark-fantasy design with unique accessories, striking magical elements, or intricate exotic garments. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The background is a rich, completely colored [LOCATION IN ENGLISH]. ABSOLUTELY NO WHITE BORDERS OR EMPTY WHITE SPACE. Waist-up portrait. Looking directly at the viewer with a friendly expression. Masterpiece, NO messy brushstrokes, NO hyper-realism." NO UI elements, NO text.
       Return "season_info" in your JSON response with the new season's name, lore, total campaigns (2 to 4), and set current_campaign to 1. Ensure you include the 'npcs' object.
       `;
     } else if (chronicle?.season_info) {
@@ -579,9 +579,31 @@ export const generateAICampaign = async (
       Season Lore: ${chronicle.season_info.setting_lore}
       Keep the theme strictly within this Season!
       ${isFinale ? "THIS IS THE SEASON FINALE. The main boss MUST be the epic 'Главарь' (Boss of the Season) and the story should conclude the arc." : "This is a continuation of the season."}
-      Return "season_info" in your JSON response to reflect the updated current_campaign index (${nextIndex}).
+      Return "season_info" in your JSON response to reflect the updated current_campaign index (${nextIndex}). DO NOT generate "city_background_prompt" or "npcs" again inside "season_info".
       `;
     }
+
+    const seasonInfoJsonFormat = isNewSeason ? `
+      "season_info": {
+        "name": "Season Name",
+        "setting_lore": "Global season lore summary",
+        "total_campaigns": 3,
+        "current_campaign": 1,
+        "city_background_prompt": "A short English prompt for an AI image generator to create a top-down dark fantasy settlement/camp map for this season. Stylized concept art, high detail, no UI, no text.",
+        "npcs": {
+          "shop": { "name": "Shadow Broker", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "fortune": { "name": "Blind Seer", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "altar": { "name": "Blood Altar", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "beast": { "name": "Beastmaster", "quote": "Quote...", "imagePrompt": "Portrait of..." },
+          "expedition": { "name": "Guild Master", "quote": "Quote...", "imagePrompt": "Portrait of..." }
+        }
+      },` : `
+      "season_info": {
+        "name": "Season Name",
+        "setting_lore": "Global season lore summary (kept same as before)",
+        "total_campaigns": ${chronicle?.season_info?.total_campaigns || 3},
+        "current_campaign": ${chronicle?.season_info?.current_campaign !== undefined ? chronicle.season_info.current_campaign + 1 : 2}
+      },`;
 
     const systemPrompt = `You are a Game Master in an RPG habit tracker.
     Create a weekly campaign. The player will face 2-3 mini-bosses (minions) over the week, leading up to a main boss.
@@ -608,26 +630,12 @@ export const generateAICampaign = async (
         "text": "Name of the weekly story-related real-life task for the player (e.g., 'Сходить в поход на выходных', 'Прочитать книгу о драконах'). MUST be realistic, not fantasy roleplay.",
         "stat": "strength",
         "difficulty": 4
-      },
-      "season_info": {
-        "name": "Season Name",
-        "setting_lore": "Global season lore summary",
-        "total_campaigns": 3,
-        "current_campaign": 1,
-        "city_background_prompt": "A short English prompt for an AI image generator to create a top-down dark fantasy settlement/camp map for this season. Stylized concept art, high detail, no UI, no text.",
-        "npcs": {
-          "shop": { "name": "Shadow Broker", "quote": "Quote...", "imagePrompt": "Portrait of..." },
-          "fortune": { "name": "Blind Seer", "quote": "Quote...", "imagePrompt": "Portrait of..." },
-          "altar": { "name": "Blood Altar", "quote": "Quote...", "imagePrompt": "Portrait of..." },
-          "beast": { "name": "Beastmaster", "quote": "Quote...", "imagePrompt": "Portrait of..." },
-          "expedition": { "name": "Guild Master", "quote": "Quote...", "imagePrompt": "Portrait of..." }
-        }
-      },
+      },${seasonInfoJsonFormat}
       "enemies": [
         {
           "name": "Mini-boss Name (in Russian)",
           "description": "Description of the mini-boss in Russian.",
-          "imagePrompt": "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [ENEMY DESCRIPTION]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [FITTING ATMOSPHERIC BACKGROUND]. Masterpiece, NO messy brushstrokes, NO hyper-realism. NO UI elements, NO text.",
+          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this mini-boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
           "avatarEmoji": "🐺",
           "isMiniBoss": true,
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
@@ -652,7 +660,7 @@ export const generateAICampaign = async (
         {
           "name": "Main Boss Name (in Russian)",
           "description": "Epic description of the main boss in Russian.",
-          "imagePrompt": "Medium shot, camera zoomed out. The character's torso and head must be fully visible within the frame. A polished stylized digital painting of a [ENEMY DESCRIPTION]. AAA game character portrait, Riot Games and Hearthstone style, Arcane animation style. Clean stylized forms, smooth 2.5D rendering, crisp edges, vibrant cinematic lighting. The character is positioned strictly on the right side of the canvas, leaving empty negative space on the left. Waist-up portrait. Looking directly at the viewer with a friendly expression. The background is a softly blurred [FITTING ATMOSPHERIC BACKGROUND]. Masterpiece, NO messy brushstrokes, NO hyper-realism. NO UI elements, NO text.",
+          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this main boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
           "avatarEmoji": "🐉",
           "isMiniBoss": false,
           "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
