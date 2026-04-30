@@ -79,12 +79,15 @@ export const getOpenAIClient = (apiKey: string, baseUrl?: string) => {
 function extractJSON(text: string): any {
   if (!text) throw new Error("Пустой ответ от ИИ");
   
+  // Strip <think> tags and their contents (used by models like DeepSeek-R1 or o-series)
+  const cleanedText = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
   try {
     // Attempt direct parse first
-    return JSON.parse(text);
+    return JSON.parse(cleanedText);
   } catch (e) {
     // Try to extract from markdown code blocks
-    const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const markdownMatch = cleanedText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (markdownMatch && markdownMatch[1]) {
       try {
         return JSON.parse(markdownMatch[1]);
@@ -94,17 +97,17 @@ function extractJSON(text: string): any {
     }
     
     // Try to find the first { and last }
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
+    const start = cleanedText.indexOf('{');
+    const end = cleanedText.lastIndexOf('}');
     if (start !== -1 && end !== -1 && end > start) {
       try {
-        return JSON.parse(text.slice(start, end + 1));
+        return JSON.parse(cleanedText.slice(start, end + 1));
       } catch (e3) {
         // Fallthrough
       }
     }
     
-    throw new Error("Не удалось извлечь JSON из ответа ИИ");
+    throw new Error(`Не удалось извлечь JSON из ответа ИИ.\nСырой ответ:\n${cleanedText}`);
   }
 }
 
@@ -687,12 +690,73 @@ export const generateAICampaign = async (
     Defeated bosses: ${defeatedBosses.join(', ')}
     Current story: ${currentStory}`;
 
+    const jsonSchemaReminder = `Return ONLY a valid JSON object with this exact structure, no markdown formatting:
+    {
+      "theme": "Campaign theme/name in Russian",
+      "colorTheme": "slate" | "emerald" | "rose" | "amber" | "blue" | "purple" | "cyan",
+      "mapPrompt": "A short English prompt for an AI image generator to create a top-down fantasy map for this campaign. Not photorealistic, stylized.",
+      "newStoryContext": "Updated brief storyline summary in Russian including this new threat.",
+      "masterTask": {
+        "text": "Name of the weekly story-related real-life task for the player (e.g., 'Сходить в поход на выходных', 'Прочитать книгу о драконах'). MUST be realistic, not fantasy roleplay.",
+        "stat": "strength",
+        "difficulty": 4
+      },${seasonInfoJsonFormat}
+      "enemies": [
+        {
+          "name": "Mini-boss Name (in Russian)",
+          "description": "Description of the mini-boss in Russian.",
+          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this mini-boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
+          "avatarEmoji": "🐺",
+          "isMiniBoss": true,
+          "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
+          "banter": {
+            "strength": "Твои мышцы бесполезны!",
+            "intelligence": "Жалкие фокусы!",
+            "charisma": "Твои слова пусты!",
+            "willpower": "Твоя воля сломлена!"
+          },
+          "dropTrophy": {
+            "name": "Trophy Name in Russian",
+            "description": "Short lore description in Russian.",
+            "icon": "A single emoji representing the trophy",
+            "imagePrompt": "A short English prompt for an AI image generator to create a 2D fantasy game UI icon for this trophy.",
+            "effect": {
+              "type": "xp_boost",
+              "targetStat": "strength",
+              "value": 0.01
+            }
+          }
+        },
+        {
+          "name": "Main Boss Name (in Russian)",
+          "description": "Epic description of the main boss in Russian.",
+          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this main boss.",
+          "avatarEmoji": "🐉",
+          "isMiniBoss": false,
+          "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
+          "dropTrophy": {
+            "name": "Epic Trophy Name in Russian",
+            "description": "Short lore description in Russian.",
+            "icon": "A single emoji representing the trophy",
+            "imagePrompt": "A short English prompt for an AI image generator to create a 2D fantasy game UI epic icon.",
+            "effect": {
+              "type": "boss_hp_reduction",
+              "targetStat": null,
+              "value": 0.05
+            }
+          }
+        }
+      ]
+    }`;
+
+    const finalUserPrompt = `${userPrompt}\n\nCRITICAL REMINDER FOR THINKING MODELS: Many reasoning models drop or ignore the system prompt. You MUST return ONLY a valid JSON object matching the exact structure below. DO NOT return a generic D&D campaign structure. Your response MUST contain the "theme", "colorTheme", "mapPrompt", "newStoryContext", "enemies" array, and other strictly defined fields from the JSON template.\n\n${jsonSchemaReminder}`;
+
     console.log("[AI Campaign] Requesting campaign generation...");
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: 'user', content: finalUserPrompt }
       ],
       response_format: { type: 'json_object' }
     });
@@ -703,7 +767,7 @@ export const generateAICampaign = async (
     const data = extractJSON(content);
     
     if (!data.enemies || !Array.isArray(data.enemies) || data.enemies.length === 0) {
-      throw new Error("ИИ не вернул список врагов");
+      throw new Error("ИИ не вернул список врагов.\n\nRAW RESULT:\n" + JSON.stringify(data, null, 2));
     }
 
     // Calculate dynamic HP base based on last 14 days
@@ -1031,7 +1095,8 @@ export const generateRandomEncounter = async (apiKey: string, baseUrl: string, m
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
       messages: [{ role: 'system', content: systemPrompt }],
-      response_format: { type: 'json_object' }
+      response_format: { type: 'json_object' },
+      temperature: 0.95
     });
 
     const content = response.choices?.[0]?.message?.content;

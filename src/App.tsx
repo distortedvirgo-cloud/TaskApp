@@ -193,6 +193,16 @@ export type Player = {
   familiar?: Familiar;
 };
 
+export type ImageJob = {
+  id: string;
+  type: 'city' | 'npc' | 'enemy' | 'trophy' | 'map';
+  targetId: string; 
+  prompt: string;
+  aspectRatio: string;
+  status: 'pending' | 'processing' | 'failed';
+  retryCount: number;
+};
+
 export type Boss = {
   id: string;
   level: number;
@@ -524,6 +534,20 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStep, setGenerationStep] = useState('');
 
+  const [imageQueue, setImageQueue] = useState<ImageJob[]>(() => {
+    try {
+      const saved = localStorage.getItem('questlog_image_queue');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  const [encounterCache, setEncounterCache] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('questlog_encounter_cache');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
   const [aiSettings, setAiSettings] = useState<AISettings>(() => {
     try {
       const saved = localStorage.getItem('questlog_ai_settings');
@@ -610,6 +634,139 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   const [showStoryModal, setShowStoryModal] = useState(false);
   const [selectedTrophy, setSelectedTrophy] = useState<Trophy | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    safeStorageSet('questlog_image_queue', JSON.stringify(imageQueue));
+  }, [imageQueue]);
+
+  useEffect(() => {
+    safeStorageSet('questlog_encounter_cache', JSON.stringify(encounterCache));
+  }, [encounterCache]);
+
+  const processingEncounterRef = useRef(false);
+  useEffect(() => {
+    if (!aiSettings.enableImages || !effectiveApiKey) return; // if AI is off, no events
+    if (processingEncounterRef.current) return;
+    
+    // Maintain a buffer of 2 pre-generated encounters
+    if (encounterCache.length < 2) {
+      const replenishCache = async () => {
+        processingEncounterRef.current = true;
+        try {
+          const weakestStat = Object.entries(player.stats).reduce((a, b) => a[1] < b[1] ? a : b)[0];
+          const m = await import('./lib/ai');
+          const existingTaskTexts = tasks.map(t => t.text);
+          const encounter = await m.generateRandomEncounter(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, weakestStat, existingTaskTexts);
+          if (encounter) {
+             setEncounterCache(prev => [...prev, encounter]);
+          }
+        } catch (e) {
+          console.error("Failed to pregenerate encounter", e);
+        } finally {
+          processingEncounterRef.current = false;
+        }
+      };
+      
+      // Delay so it doesn't run aggressively during startup
+      const timeout = setTimeout(replenishCache, 10000);
+      return () => clearTimeout(timeout);
+    }
+  }, [encounterCache, aiSettings, effectiveApiKey, effectiveAiBaseUrl, player.stats, tasks]);
+
+  const processingImagesRef = useRef(false);
+
+  useEffect(() => {
+    if (!aiSettings.enableImages || !effectiveApiKey) return;
+    if (processingImagesRef.current) return;
+    
+    const pendingJobs = imageQueue.filter(j => j.status === 'pending');
+    if (pendingJobs.length === 0) return;
+
+    const runJobs = async () => {
+      processingImagesRef.current = true;
+      const jobsToProcess = pendingJobs.slice(0, 2); // Process 2 at a time
+      
+      setImageQueue(prev => prev.map(j => jobsToProcess.some(job => job.id === j.id) ? { ...j, status: 'processing' } : j));
+
+      const { generateAIImage } = await import('./lib/ai');
+
+      const promises = jobsToProcess.map(async (job) => {
+        try {
+           const url = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", job.prompt, true, job.aspectRatio);
+           if (url) {
+              if (job.type === 'city') {
+                setGameState(prev => ({
+                   ...prev,
+                   chronicle: prev.chronicle ? {
+                      ...prev.chronicle,
+                      season_info: prev.chronicle.season_info ? {
+                         ...prev.chronicle.season_info,
+                         city_background_url: url
+                      } : prev.chronicle.season_info
+                   } : prev.chronicle
+                }));
+              } else if (job.type === 'map') {
+                setCampaign(prev => {
+                   if (!prev) return prev;
+                   return { ...prev, mapUrl: url };
+                });
+              } else if (job.type === 'npc') {
+                setGameState(prev => {
+                   if (!prev.chronicle?.season_info?.npcs || !prev.chronicle.season_info.npcs[job.targetId]) return prev;
+                   return {
+                      ...prev,
+                      chronicle: {
+                         ...prev.chronicle,
+                         season_info: {
+                            ...prev.chronicle.season_info,
+                            npcs: {
+                               ...prev.chronicle.season_info.npcs,
+                               [job.targetId]: {
+                                  ...prev.chronicle.season_info.npcs[job.targetId],
+                                  imageUrl: url
+                               }
+                            }
+                         }
+                      }
+                   };
+                });
+              } else if (job.type === 'enemy') {
+                setCampaign(prev => {
+                   if (!prev) return prev;
+                   return { ...prev, enemies: prev.enemies.map(e => e.id === job.targetId ? { ...e, imageUrl: url } : e) };
+                });
+                setBoss(prev => {
+                   if (prev && prev.id === job.targetId) {
+                      return { ...prev, imageUrl: url };
+                   }
+                   return prev;
+                });
+              } else if (job.type === 'trophy') {
+                setCampaign(prev => {
+                   if (!prev) return prev;
+                   return { ...prev, enemies: prev.enemies.map(e => (e.dropTrophy && e.dropTrophy.id === job.targetId) ? { ...e, dropTrophy: { ...e.dropTrophy, imageUrl: url } } : e) };
+                });
+                setBoss(prev => {
+                   if (prev && prev.dropTrophy && prev.dropTrophy.id === job.targetId) {
+                      return { ...prev, dropTrophy: { ...prev.dropTrophy, imageUrl: url } };
+                   }
+                   return prev;
+                });
+              }
+           }
+           setImageQueue(prev => prev.filter(j => j.id !== job.id));
+        } catch (e) {
+           console.error("Queue Image gen failed for job", job.id, e);
+           setImageQueue(prev => prev.map(j => j.id === job.id ? { ...j, status: 'failed' } : j));
+        }
+      });
+
+      await Promise.allSettled(promises);
+      processingImagesRef.current = false;
+    };
+
+    runJobs();
+  }, [imageQueue, aiSettings, effectiveApiKey, effectiveAiBaseUrl]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -774,32 +931,56 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           };
         });
 
-        // Generate random encounter / Map Event
+        // Generate random encounter / Map Event (Spawn up to 2)
         if (effectiveApiKey) {
           const weakestStat = Object.entries(player.stats).reduce((a, b) => a[1] < b[1] ? a : b)[0];
           const existingTaskTexts = tasks.map(t => t.text);
-          import('./lib/ai').then(m => m.generateRandomEncounter(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, weakestStat, existingTaskTexts)).then(encounter => {
-            if (encounter) {
-              setGameState(prevGS => {
-                const currentEvents = prevGS.events || [];
-                if (currentEvents.length >= 5) return prevGS; // City under siege
-                
-                // Find empty zones
-                const availableZones = Array.from({length: 10}, (_, i) => i).filter(i => !currentEvents.some(e => e.zoneIndex === i));
-                if (availableZones.length === 0) return prevGS;
-                
-                const randomZone = availableZones[Math.floor(Math.random() * availableZones.length)];
-                
-                const newEvent = {
-                  id: crypto.randomUUID(),
-                  zoneIndex: randomZone,
-                  description: encounter.story,
-                  taskPrompt: encounter.task,
-                  rewardGold: (encounter.difficulty || 1) * 15
-                };
-                
-                return { ...prevGS, events: [...currentEvents, newEvent] };
-              });
+          import('./lib/ai').then(async m => {
+            let availableCache = [...encounterCache];
+            const spawnedEncounters = [];
+            for (let i = 0; i < 2; i++) {
+              try {
+                let encounter = null;
+                // Try cache first
+                if (availableCache.length > 0) {
+                   encounter = availableCache[0];
+                   availableCache = availableCache.slice(1);
+                } else {
+                   encounter = await m.generateRandomEncounter(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, weakestStat, existingTaskTexts);
+                }
+
+                if (encounter) {
+                  spawnedEncounters.push(encounter);
+                }
+              } catch (err) {
+                console.error("Failed to generate encounter", err);
+              }
+            }
+            if (spawnedEncounters.length > 0) {
+               setEncounterCache(availableCache);
+               setGameState(prevGS => {
+                    let currentEvents = prevGS.events || [];
+                    for (const enc of spawnedEncounters) {
+                       if (currentEvents.length >= 5) break; // City under siege
+                       
+                       // Find empty zones
+                       const availableZones = Array.from({length: 10}, (_, i) => i).filter(i => !currentEvents.some(e => e.zoneIndex === i));
+                       if (availableZones.length === 0) break;
+                       
+                       const randomZone = availableZones[Math.floor(Math.random() * availableZones.length)];
+                       
+                       const newEvent = {
+                         id: crypto.randomUUID(),
+                         zoneIndex: randomZone,
+                         description: enc.story,
+                         taskPrompt: enc.task,
+                         rewardGold: (enc.difficulty || 1) * 15
+                       };
+                       
+                       currentEvents = [...currentEvents, newEvent];
+                    }
+                    return { ...prevGS, events: currentEvents };
+                  });
             }
           });
         }
@@ -1629,79 +1810,51 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           console.error("Shop items generation failed", shopErr);
         }
 
-        setGenerationProgress(45);
-        setGenerationStep('Рисуем карту кампании...');
-        // Generate map image
+        setGenerationProgress(50);
+        setGenerationStep('Добавляем задачи визуализации в очередь...');
+        const newQueueJobs: ImageJob[] = [];
+        
         if (aiCampaign.campaign.mapPrompt) {
-           try {
-             const mapUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", aiCampaign.campaign.mapPrompt, aiSettings.enableImages);
-             aiCampaign.campaign.mapUrl = mapUrl;
-           } catch (imgError) {
-             console.error("Map image generation failed", imgError);
-           }
+          newQueueJobs.push({ id: crypto.randomUUID(), type: 'map', targetId: 'map', prompt: aiCampaign.campaign.mapPrompt, aspectRatio: '16:9', status: 'pending', retryCount: 0 });
+        }
+        if (aiCampaign.newSeasonInfo?.city_background_prompt && !aiCampaign.newSeasonInfo.city_background_url) {
+          newQueueJobs.push({ id: crypto.randomUUID(), type: 'city', targetId: 'city', prompt: aiCampaign.newSeasonInfo.city_background_prompt, aspectRatio: '9:16', status: 'pending', retryCount: 0 });
+        }
+        if (aiCampaign.newSeasonInfo?.npcs) {
+          Object.entries(aiCampaign.newSeasonInfo.npcs).forEach(([key, npc]) => {
+            if (npc.imagePrompt && !npc.imageUrl) {
+              newQueueJobs.push({ id: crypto.randomUUID(), type: 'npc', targetId: key, prompt: npc.imagePrompt, aspectRatio: '3:4', status: 'pending', retryCount: 0 });
+            }
+          });
         }
         
-        setGenerationProgress(60);
-        setGenerationStep('Создание архитектуры города...');
-        // Generate city map image if needed
-        if (aiCampaign.newSeasonInfo?.city_background_prompt && !aiCampaign.newSeasonInfo.city_background_url) {
-           try {
-             const cityUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", aiCampaign.newSeasonInfo.city_background_prompt, aiSettings.enableImages, "9:16");
-             aiCampaign.newSeasonInfo.city_background_url = cityUrl || undefined;
-           } catch (imgError) {
-             console.error("City image generation failed", imgError);
-           }
-        }
-
-        setGenerationProgress(70);
-        setGenerationStep('Призыв жителей города...');
-        if (aiCampaign.newSeasonInfo?.npcs) {
-          const npcsList = Object.values(aiCampaign.newSeasonInfo.npcs);
-          const totalNpcs = npcsList.length;
-          let npcIndex = 0;
-          for (const npc of npcsList) {
-             try {
-                if (npc.imagePrompt && !npc.imageUrl) {
-                   console.log(`[Game] Requesting image for NPC: ${npc.name}`);
-                   npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "3:4") || undefined;
-                }
-             } catch(err) {
-                console.error("NPC generation failed", err);
-             }
-             npcIndex++;
-             setGenerationProgress(70 + Math.floor((10 * npcIndex) / totalNpcs));
-          }
-        }
-
         setGenerationProgress(80);
-        setGenerationStep('Призыв монстров...');
-        // Generate enemy images and their drops
-        const totalEnemies = aiCampaign.campaign.enemies.length;
-        let enemyIndex = 0;
-        for (let enemy of aiCampaign.campaign.enemies) {
-          if (enemy.imagePrompt) {
+        setGenerationStep('Призыв сущности...');
+        let firstBoss = aiCampaign.campaign.enemies[0];
+        if (firstBoss && firstBoss.imagePrompt && !firstBoss.imageUrl && aiSettings.enableImages) {
             try {
-              console.log("[Game] Requesting image for enemy:", enemy.name);
-              enemy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.imagePrompt, aiSettings.enableImages, "3:4");
-            } catch (imgError) {
-              console.error("Enemy image generation failed", imgError);
+                firstBoss.imageUrl = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", firstBoss.imagePrompt, true, "1:1") || undefined;
+            } catch (err) {
+                console.error("Failed to generate first boss image", err);
             }
+        }
+
+        aiCampaign.campaign.enemies.forEach((enemy, idx) => {
+          if (idx > 0 && enemy.imagePrompt && !enemy.imageUrl) {
+            newQueueJobs.push({ id: crypto.randomUUID(), type: 'enemy', targetId: enemy.id, prompt: enemy.imagePrompt, aspectRatio: '1:1', status: 'pending', retryCount: 0 });
           }
-          
           if (enemy.dropTrophy) {
             if (!enemy.dropTrophy.imagePrompt) {
-              console.log(`[Game] Missing imagePrompt for trophy ${enemy.dropTrophy.name}, generating fallback prompt`);
               enemy.dropTrophy.imagePrompt = `A 2D fantasy game UI single icon for a magical item named "${enemy.dropTrophy.name}". Epic loot. Isolated on dark background, no text.`;
             }
-            try {
-              console.log("[Game] Requesting image for trophy:", enemy.dropTrophy.name);
-              enemy.dropTrophy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.dropTrophy.imagePrompt, aiSettings.enableImages);
-            } catch (imgError) {
-              console.error("Trophy image generation failed", imgError);
+            if (!enemy.dropTrophy.imageUrl) {
+              newQueueJobs.push({ id: crypto.randomUUID(), type: 'trophy', targetId: enemy.dropTrophy.id, prompt: enemy.dropTrophy.imagePrompt, aspectRatio: '1:1', status: 'pending', retryCount: 0 });
             }
           }
-          enemyIndex++;
-          setGenerationProgress(80 + Math.floor((20 * enemyIndex) / totalEnemies));
+        });
+
+        if (newQueueJobs.length > 0) {
+          setImageQueue(prev => [...prev, ...newQueueJobs]);
         }
 
         setGenerationProgress(100);
@@ -1807,61 +1960,51 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         console.error("Shop items generation failed", shopErr);
       }
 
-      setGenerationProgress(45);
-      setGenerationStep('Рисуем карту кампании...');
+      setGenerationProgress(50);
+      setGenerationStep('Добавляем задачи визуализации в очередь...');
+      const newQueueJobs: ImageJob[] = [];
+      
       if (aiCampaign.campaign.mapPrompt) {
-         try {
-           const mapUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", aiCampaign.campaign.mapPrompt, aiSettings.enableImages);
-           aiCampaign.campaign.mapUrl = mapUrl;
-         } catch (imgError) {
-           console.error("Map image generation failed", imgError);
-         }
+        newQueueJobs.push({ id: crypto.randomUUID(), type: 'map', targetId: 'map', prompt: aiCampaign.campaign.mapPrompt, aspectRatio: '16:9', status: 'pending', retryCount: 0 });
       }
-
-      setGenerationProgress(60);
-      setGenerationStep('Создание архитектуры города...');
       if (aiCampaign.newSeasonInfo?.city_background_prompt && !aiCampaign.newSeasonInfo.city_background_url) {
-         try {
-           const cityUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", aiCampaign.newSeasonInfo.city_background_prompt, aiSettings.enableImages, "9:16");
-           aiCampaign.newSeasonInfo.city_background_url = cityUrl || undefined;
-         } catch (imgError) {
-           console.error("City image generation failed", imgError);
-         }
+        newQueueJobs.push({ id: crypto.randomUUID(), type: 'city', targetId: 'city', prompt: aiCampaign.newSeasonInfo.city_background_prompt, aspectRatio: '9:16', status: 'pending', retryCount: 0 });
       }
-
-      setGenerationProgress(70);
-      setGenerationStep('Призыв жителей города...');
       if (aiCampaign.newSeasonInfo?.npcs) {
-        const npcsList = Object.values(aiCampaign.newSeasonInfo.npcs);
-        const totalNpcs = npcsList.length;
-        let npcIndex = 0;
-        for (const npc of npcsList) {
-           try {
-              if (npc.imagePrompt && !npc.imageUrl) {
-                 npc.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "3:4") || undefined;
-              }
-           } catch(err) {
-              console.error("NPC generation failed", err);
-           }
-           npcIndex++;
-           setGenerationProgress(70 + Math.floor((10 * npcIndex) / totalNpcs));
-        }
+        Object.entries(aiCampaign.newSeasonInfo.npcs).forEach(([key, npc]) => {
+          if (npc.imagePrompt && !npc.imageUrl) {
+            newQueueJobs.push({ id: crypto.randomUUID(), type: 'npc', targetId: key, prompt: npc.imagePrompt, aspectRatio: '3:4', status: 'pending', retryCount: 0 });
+          }
+        });
+      }
+      
+      setGenerationProgress(80);
+      setGenerationStep('Призыв сущности...');
+      let firstBoss = aiCampaign.campaign.enemies[0];
+      if (firstBoss && firstBoss.imagePrompt && !firstBoss.imageUrl && aiSettings.enableImages) {
+          try {
+              firstBoss.imageUrl = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", firstBoss.imagePrompt, true, "1:1") || undefined;
+          } catch (err) {
+              console.error("Failed to generate first boss image", err);
+          }
       }
 
-      setGenerationProgress(80);
-      setGenerationStep('Призыв монстров...');
-      const totalEnemies = aiCampaign.campaign.enemies.length;
-      let enemyIndex = 0;
-      for (let enemy of aiCampaign.campaign.enemies) {
-        if (enemy.imagePrompt) {
-          try {
-            enemy.imageUrl = await generateAIImage(aiSettings.apiKey || '', aiSettings.baseUrl || '', aiSettings.imageModel || "dall-e-3", enemy.imagePrompt, aiSettings.enableImages, "3:4");
-          } catch (imgError) {
-            console.error("Enemy image generation failed", imgError);
+      aiCampaign.campaign.enemies.forEach((enemy, idx) => {
+        if (idx > 0 && enemy.imagePrompt && !enemy.imageUrl) {
+          newQueueJobs.push({ id: crypto.randomUUID(), type: 'enemy', targetId: enemy.id, prompt: enemy.imagePrompt, aspectRatio: '1:1', status: 'pending', retryCount: 0 });
+        }
+        if (enemy.dropTrophy) {
+          if (!enemy.dropTrophy.imagePrompt) {
+            enemy.dropTrophy.imagePrompt = `A 2D fantasy game UI single icon for a magical item named "${enemy.dropTrophy.name}". Epic loot. Isolated on dark background, no text.`;
+          }
+          if (!enemy.dropTrophy.imageUrl) {
+            newQueueJobs.push({ id: crypto.randomUUID(), type: 'trophy', targetId: enemy.dropTrophy.id, prompt: enemy.dropTrophy.imagePrompt, aspectRatio: '1:1', status: 'pending', retryCount: 0 });
           }
         }
-        enemyIndex++;
-        setGenerationProgress(80 + Math.floor((20 * enemyIndex) / totalEnemies));
+      });
+
+      if (newQueueJobs.length > 0) {
+        setImageQueue(prev => [...prev, ...newQueueJobs]);
       }
 
       setGenerationProgress(100);
@@ -1933,19 +2076,20 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         }
 
         const npcsList = Object.entries(npcsRaw);
+        const newQueueJobs: ImageJob[] = [];
+
         for (const [key, npc] of npcsList) {
-            console.log(`[Game] Requesting new image for NPC: ${npc.name}`);
             if (npc.imagePrompt) {
-               const img = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", npc.imagePrompt, aiSettings.enableImages, "3:4");
-               npc.imageUrl = img || undefined;
+               newQueueJobs.push({ id: crypto.randomUUID(), type: 'npc', targetId: key, prompt: npc.imagePrompt, aspectRatio: '3:4', status: 'pending', retryCount: 0 });
             }
         }
 
-        let cityImageUrl: string | undefined = undefined;
         if (townData && townData.city_background_prompt) {
-            console.log(`[Game] Requesting new image for City`);
-            const cityImg = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", townData.city_background_prompt, aiSettings.enableImages, "9:16");
-            cityImageUrl = cityImg || undefined;
+            newQueueJobs.push({ id: crypto.randomUUID(), type: 'city', targetId: 'city', prompt: townData.city_background_prompt, aspectRatio: '9:16', status: 'pending', retryCount: 0 });
+        }
+
+        if (newQueueJobs.length > 0) {
+            setImageQueue(prev => [...prev, ...newQueueJobs]);
         }
 
         setGameState(prev => {
@@ -1954,9 +2098,6 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                updatedChronicle.season_info.npcs = npcsRaw as any;
                if (townData.city_background_prompt) {
                   updatedChronicle.season_info.city_background_prompt = townData.city_background_prompt;
-               }
-               if (cityImageUrl) {
-                  updatedChronicle.season_info.city_background_url = cityImageUrl;
                }
             }
             return { ...prev, chronicle: updatedChronicle as import('./App').HeroChronicle };
@@ -2025,9 +2166,11 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
               className="fixed top-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-[calc(28rem-2rem)] bg-rose-500/90 text-white p-4 rounded-xl shadow-lg z-[1050] flex items-start gap-3 backdrop-blur-md border border-rose-400"
             >
               <AlertTriangle className="shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-bold text-sm">Ошибка API</h3>
-                <p className="text-xs opacity-90 mt-1">{apiError}</p>
+              <div className="flex-1 w-full max-w-full overflow-hidden">
+                <h3 className="font-bold text-sm">Ошибка API / Консоль</h3>
+                <div className="text-[10px] opacity-90 mt-1 max-h-[60vh] overflow-y-auto whitespace-pre-wrap font-mono break-words bg-black/20 p-2 rounded select-text text-left relative z-[1060]">
+                  {apiError}
+                </div>
               </div>
               <button onClick={() => setApiError(null)} className="p-1 hover:bg-rose-400/50 rounded-lg transition-colors">
                 <X size={16} />
@@ -2713,9 +2856,14 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
               <div className="space-y-4">
                 {(() => {
                   const visibleTasks = tasks.filter(t => (!t.availableAt || t.availableAt <= Date.now()));
-                  const activeTasks = visibleTasks.filter(t => !t.completed);
-                  const pendingTasks = visibleTasks.filter(t => t.completed && !t.rewarded);
-                  const finishedTasks = visibleTasks.filter(t => t.completed && t.rewarded);
+                  const sortTasks = (arr: typeof tasks) => arr.sort((a, b) => {
+                    if (a.isMasterTask && !b.isMasterTask) return -1;
+                    if (!a.isMasterTask && b.isMasterTask) return 1;
+                    return 0; // maintain original order (maybe creation time?)
+                  });
+                  const activeTasks = sortTasks(visibleTasks.filter(t => !t.completed));
+                  const pendingTasks = sortTasks(visibleTasks.filter(t => t.completed && !t.rewarded));
+                  const finishedTasks = sortTasks(visibleTasks.filter(t => t.completed && t.rewarded));
 
                   const renderTask = (task: typeof tasks[0]) => {
                     const statData = STATS[task.stat];
@@ -2730,6 +2878,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         key={`task-${task.id}`}
                         onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
                         className={`group flex items-center gap-3 p-4 transition-all glass-card cursor-pointer shadow-md ${
+                          task.isMasterTask ? '!border-orange-500/80 shadow-[0_0_15px_rgba(249,115,22,0.2)] bg-amber-500/5' : ''
+                        } ${
                           task.completed
                             ? 'opacity-50 grayscale pt-3 pb-3'
                             : 'hover:border-white/10'
@@ -3100,6 +3250,15 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 }}
                                 transition={bossHit ? { duration: 0.2 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }}
                               />
+                            ) : boss.imagePrompt ? (
+                              <div className="flex flex-col items-center justify-center gap-4 text-white/30 animate-pulse mt-4">
+                                <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
+                                   <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
+                                      <div className={`w-2 h-2 rounded-full ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'bg-slate-500'} shadow-[0_0_10px_currentColor]`} />
+                                   </div>
+                                </div>
+                                <span className="text-xs uppercase tracking-[3px] font-mono">Призыв сущности...</span>
+                              </div>
                             ) : boss.avatarEmoji ? (
                               <span className="text-8xl drop-shadow-2xl">{boss.avatarEmoji}</span>
                             ) : (

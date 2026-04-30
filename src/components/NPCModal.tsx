@@ -120,7 +120,16 @@ export const NPCModal: React.FC<NPCModalProps> = ({
                   referrerPolicy="no-referrer"
                 />
               ) : (
-                <div className="w-full h-full opacity-70 bg-[#050A0F]" />
+                <div className="w-full h-full opacity-70 bg-[#050A0F] flex items-center justify-center -mt-32">
+                   <div className="flex flex-col items-center gap-4 text-white/30 animate-pulse">
+                     <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
+                           <div className={`w-2 h-2 rounded-full ${t.bg} shadow-[0_0_10px_currentColor]`} />
+                        </div>
+                     </div>
+                     <span className="text-xs uppercase tracking-[3px] font-mono">Призыв видения...</span>
+                   </div>
+                </div>
               )}
               {/* Refined Gradient requested by user */}
               <div 
