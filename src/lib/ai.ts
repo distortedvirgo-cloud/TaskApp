@@ -310,12 +310,23 @@ export const categorizeTasksBatchWithAI = async (apiKey: string, baseUrl: string
 
     const tasksList = tasks.map((t, i) => `${i + 1}. "${t}"`).join('\n');
 
+    const jsonSchemaReminder = `Return ONLY a valid JSON object with this exact structure, no markdown formatting:
+    {
+      "results": [
+        {
+          "stat": "strength" | "intelligence" | "charisma" | "willpower",
+          "difficulty": 1 | 2 | 3 | 4 | 5
+        }
+      ]
+    }`;
+    const userMessage = `Categorize and evaluate the following tasks:\n${tasksList}\n\nCRITICAL REMINDER FOR THINKING MODELS: Many reasoning models ignore the system structure. You MUST return ONLY a valid JSON object matching the exact structure below. Your response MUST contain the "results" array.\n\n${jsonSchemaReminder}`;
+
     console.log("[AI Categorization] Requesting batch task categorization...");
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Categorize and evaluate the following tasks:\n${tasksList}` }
+        { role: 'user', content: userMessage }
       ],
       response_format: { type: 'json_object' }
     });
@@ -326,7 +337,7 @@ export const categorizeTasksBatchWithAI = async (apiKey: string, baseUrl: string
     const data = extractJSON(content);
 
     if (!Array.isArray(data.results) || data.results.length !== tasks.length) {
-      throw new Error("Неверный формат ответа ИИ (ожидался массив results правильной длины)");
+      throw new Error("Неверный формат ответа ИИ (ожидался массив results правильной длины).\n\nRAW RESULT:\n" + JSON.stringify(data, null, 2));
     }
 
     console.log("[AI Categorization] Successfully categorized tasks batch.");
@@ -368,12 +379,27 @@ export const evaluateTasksBatchWithAI = async (apiKey: string, baseUrl: string, 
 
     const tasksList = tasks.map((t, i) => `${i + 1}. "${t.text}" (Current category: ${t.stat})`).join('\n');
 
+    const jsonSchemaReminder = `Return ONLY a valid JSON object with this exact structure, no markdown formatting:
+    {
+      "results": [
+        {
+          "xp": number,
+          "statXp": number,
+          "gold": number,
+          "difficulty": number,
+          "suggestedStat": "strength" | "intelligence" | "charisma" | "willpower"
+        }
+      ],
+      "gmComment": "A short, encouraging, in-character comment from the Game Master in Russian summarizing the player's overall achievements."
+    }`;
+    const userMessage = `The player just completed the following tasks:\n${tasksList}\nEvaluate each task and provide a summary comment.\n\nCRITICAL REMINDER FOR THINKING MODELS: Many reasoning models ignore the system structure. You MUST return ONLY a valid JSON object matching the exact structure below. Your response MUST contain the "results" array.\n\n${jsonSchemaReminder}`;
+
     console.log("[AI Evaluation] Requesting batch task evaluation...");
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `The player just completed the following tasks:\n${tasksList}\nEvaluate each task and provide a summary comment.` }
+        { role: 'user', content: userMessage }
       ],
       response_format: { type: 'json_object' }
     });
@@ -384,7 +410,7 @@ export const evaluateTasksBatchWithAI = async (apiKey: string, baseUrl: string, 
     const data = extractJSON(content);
 
     if (!Array.isArray(data.results) || data.results.length !== tasks.length) {
-      throw new Error("Неверный формат ответа ИИ (ожидался массив results правильной длины)");
+      throw new Error("Неверный формат ответа ИИ (ожидался массив results правильной длины).\n\nRAW RESULT:\n" + JSON.stringify(data, null, 2));
     }
 
     console.log("[AI Evaluation] Successfully evaluated tasks batch.");
