@@ -567,9 +567,12 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     }
   };
 
-  const effectiveApiKey = aiSettings.useGeminiMode ? (aiSettings.geminiApiKey || '') : (aiSettings.apiKey || '');
-  const effectiveAiBaseUrl = aiSettings.useGeminiMode ? "https://generativelanguage.googleapis.com/v1beta/openai/" : (aiSettings.baseUrl || '');
-  const effectiveAiModel = aiSettings.useGeminiMode ? "gemini-3.1-flash-lite-preview" : (aiSettings.model || 'gpt-4o-mini');
+  const defaultToGemini = (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY && !aiSettings.apiKey && !aiSettings.baseUrl) ? true : false;
+  const useGemini = aiSettings.useGeminiMode || defaultToGemini;
+  
+  const effectiveApiKey = useGemini ? (aiSettings.geminiApiKey || ((typeof process !== 'undefined' && process.env) ? process.env.GEMINI_API_KEY : '') || '') : (aiSettings.apiKey || '');
+  const effectiveAiBaseUrl = useGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : (aiSettings.baseUrl || '');
+  const effectiveAiModel = useGemini ? "gemini-3.1-flash-lite-preview" : (aiSettings.model || 'gpt-4o-mini');
 
   const [gameState, setGameState] = useState(() => {
     const defaultState = { 
@@ -3278,12 +3281,20 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                   </button>
                                 )}
                               </>
-                            ) : boss.imagePrompt ? (
+                            ) : (aiSettings.enableImages !== false && boss.imagePrompt) ? (
                               (() => {
                                 const bossImageJob = imageQueue.find(j => j.type === 'enemy' && j.targetId === boss.id);
                                 const isGeneratingBossImage = bossImageJob && (bossImageJob.status === 'pending' || bossImageJob.status === 'processing' || (bossImageJob.status === 'failed' && (bossImageJob.retryCount || 0) < 3));
                                 
-                                if (isGeneratingBossImage || (!effectiveApiKey && !effectiveAiBaseUrl)) {
+                                if (!effectiveApiKey && !effectiveAiBaseUrl) {
+                                  return (
+                                     <div className="flex flex-col items-center justify-center gap-2 mt-4 text-white/50 relative z-10 w-full px-8 text-center max-w-[280px]">
+                                       <AlertTriangle size={20} className="text-amber-500/50 mb-1" />
+                                       <span className="text-xs text-amber-500/70 uppercase tracking-[2px] font-bold">API ключ не указан</span>
+                                       <span className="text-[9px] text-slate-500 leading-tight font-medium">Для генерации изображений укажите ключ в настройках</span>
+                                     </div>
+                                  );
+                                } else if (isGeneratingBossImage) {
                                   return (
                                     <div className="flex flex-col items-center justify-center gap-4 text-white/30 animate-pulse mt-4">
                                       <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
