@@ -3031,37 +3031,43 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
                   return (
                     <>
-                      {activeTasks.length > 0 || pendingTasks.length > 0 || finishedTasks.length > 0 ? (
+                      {activeTasks.length > 0 || pendingTasks.length > 0 ? (
                         <>
                           <h3 className="text-[17px] font-bold text-white mt-2 mb-1">Сегодня</h3>
                           <div className="space-y-3">
                             <AnimatePresence mode="popLayout">
                               {activeTasks.map(t => renderTask(t))}
                               {pendingTasks.map(t => renderTask(t))}
-                              {finishedTasks.map(t => renderTask(t))}
                             </AnimatePresence>
                           </div>
                         </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-                          <div className="opacity-20">
-                            <Flame size={64} className="text-[#E0E0E0]" />
+                        finishedTasks.length === 0 && (
+                          <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                            <div className="opacity-20">
+                              <Flame size={64} className="text-[#E0E0E0]" />
+                            </div>
+                            <p className="lore-text text-xl text-[#8A8D93]">Герой отдыхает. Добавьте задачу, чтобы продолжить путь.</p>
                           </div>
-                          <p className="lore-text text-xl text-[#8A8D93]">Герой отдыхает. Добавьте задачу, чтобы продолжить путь.</p>
-                        </div>
+                        )
                       )}
                       
                       {finishedTasks.length > 0 && (
-                        <div className="pt-4 mt-6">
+                        <div className="pt-4 mt-2">
                           <button
                             onClick={clearCompleted}
-                            className="flex items-center justify-between w-full p-4 text-sm text-purple-300 hover:text-purple-200 bg-[#16122b]/80 transition-colors rounded-[16px] border border-purple-500/20 cursor-pointer shadow-lg"
+                            className="flex items-center justify-between w-full mb-3 p-4 text-sm text-purple-300 hover:text-purple-200 bg-[#16122b]/80 transition-colors rounded-[16px] border border-purple-500/20 cursor-pointer shadow-lg"
                           >
                             <span className="font-bold flex items-center gap-2">
                               <span className="text-lg">✨</span> Очистить выполненные
                             </span>
                             <ChevronRight size={16} />
                           </button>
+                          <div className="space-y-3">
+                            <AnimatePresence mode="popLayout">
+                              {finishedTasks.map(t => renderTask(t))}
+                            </AnimatePresence>
+                          </div>
                         </div>
                       )}
                     </>
@@ -3255,14 +3261,44 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 transition={bossHit ? { duration: 0.2 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }}
                               />
                             ) : boss.imagePrompt ? (
-                              <div className="flex flex-col items-center justify-center gap-4 text-white/30 animate-pulse mt-4">
-                                <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
-                                   <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
-                                      <div className={`w-2 h-2 rounded-full ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'bg-slate-500'} shadow-[0_0_10px_currentColor]`} />
-                                   </div>
-                                </div>
-                                <span className="text-xs uppercase tracking-[3px] font-mono">Призыв сущности...</span>
-                              </div>
+                              (() => {
+                                const bossImageJob = imageQueue.find(j => j.type === 'enemy' && j.targetId === boss.id);
+                                const isGeneratingBossImage = bossImageJob && (bossImageJob.status === 'pending' || bossImageJob.status === 'processing' || (bossImageJob.status === 'failed' && (bossImageJob.retryCount || 0) < 3));
+                                
+                                if (isGeneratingBossImage || (!effectiveApiKey && !effectiveAiBaseUrl)) {
+                                  return (
+                                    <div className="flex flex-col items-center justify-center gap-4 text-white/30 animate-pulse mt-4">
+                                      <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
+                                         <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
+                                            <div className={`w-2 h-2 rounded-full ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'bg-slate-500'} shadow-[0_0_10px_currentColor]`} />
+                                         </div>
+                                      </div>
+                                      <span className="text-xs uppercase tracking-[3px] font-mono">Призыв сущности...</span>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <div className="flex flex-col items-center justify-center gap-4 mt-4 text-white/50 relative z-10">
+                                      <div className="w-16 h-16 rounded-full border border-red-500/30 flex items-center justify-center bg-red-500/10">
+                                        <RefreshCw size={24} className="text-red-400" />
+                                      </div>
+                                      <span className="text-xs text-red-400 text-center px-4 font-bold tracking-widest uppercase mt-[-8px]">Сбой призыва</span>
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setImageQueue(prev => {
+                                              const filtered = prev.filter(j => !(j.type === 'enemy' && j.targetId === boss.id));
+                                              return [...filtered, { id: crypto.randomUUID(), type: 'enemy', targetId: boss.id, prompt: boss.imagePrompt!, aspectRatio: '1:1', status: 'pending', retryCount: 0 }];
+                                          });
+                                        }}
+                                        className="px-6 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/30 rounded-xl text-xs font-semibold transition-colors mt-1 shadow-lg cursor-pointer"
+                                      >
+                                        Повторить
+                                      </button>
+                                    </div>
+                                  );
+                                }
+                              })()
                             ) : boss.avatarEmoji ? (
                               <span className="text-8xl drop-shadow-2xl">{boss.avatarEmoji}</span>
                             ) : (
