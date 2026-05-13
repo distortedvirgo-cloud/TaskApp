@@ -123,6 +123,7 @@ export const askMasterAdvice = async (apiKey: string, baseUrl: string, model: st
     
     Игрок просит совета.
     Ограничение: Опирайся СТРОГО на предоставленные данные.
+    КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ современные психологические слова (прокрастинация, фрустрация, демотивация, выгорание, стресс). Используй фэнтезийные термины.
     
     Верни короткий ответ (2-3 предложения), где ты:
     1. Упоминаешь прошлый контекст (например, "Я вижу в Летописи, что вчера ты...").
@@ -221,13 +222,14 @@ export const generateFamiliar = async (
 export const generateDailyMemoryLog = async (apiKey: string, baseUrl: string, model: string, completed: string[], missed: string[]) => {
   try {
     const openai = getOpenAIClient(apiKey, baseUrl);
-    const prompt = `Ты — беспристрастный летописец. Опиши прошедший день героя одним коротким предложением от третьего лица, отметив его слабости и успехи.
-    Ограничение: Опирайся СТРОГО на предоставленные данные. Не выдумывай герою задачи или привычки, которых нет в списке.
+    const prompt = `Ты — беспристрастный летописец в фэнтезийном мире. Опиши прошедший день героя одним коротким, атмосферным предложением от третьего лица, отметив его слабости и успехи.
+    Ограничение: Опирайся СТРОГО на предоставленные данные (переведи их в фэнтези-контекст, если нужно). Не выдумывай герою ничего лишнего.
+    КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ современные слова: прокрастинация, фрустрация, демотивация, выгорание, стресс, соцсети. Вместо них используй "темные чары", "оцепенение", "усталость духа" и прочее.
     
     Выполненные задачи: ${completed.length > 0 ? completed.join(', ') : 'Нет'}
     Пропущенные задачи: ${missed.length > 0 ? missed.join(', ') : 'Нет'}
     
-    Верни ТОЛЬКО одно предложение на русском языке.`;
+    Верни ТОЛЬКО одно предложение на русском языке в фэнтезийном стиле.`;
     
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
@@ -249,6 +251,7 @@ export const updateBehaviorAnalytics = async (apiKey: string, baseUrl: string, m
     
     const prompt = `Ты — Мастер Игры. Проанализируй поведение игрока за последнюю неделю.
     Ограничение: Опирайся СТРОГО на предоставленные данные. Не выдумывай.
+    КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ современные психологические слова в master_summary (прокрастинация, фрустрация, выгорание, депрессия, стресс). Используй мрачное фэнтезийное описание (оцепенение, порча, лень, забытье).
     
     Недавняя память (дни):
     ${memoryLog.join('\n')}
@@ -258,9 +261,9 @@ export const updateBehaviorAnalytics = async (apiKey: string, baseUrl: string, m
     
     Верни ТОЛЬКО валидный JSON объект со следующей структурой:
     {
-      "ignored_tasks_patterns": ["паттерн 1", "паттерн 2"], // какие типы задач игрок избегает (например "уборка", "спорт")
+      "ignored_tasks_patterns": ["паттерн 1", "паттерн 2"], // какие типы задач игрок избегает (в фэнтези терминах, например "забота о доспехах" вместо "уборка")
       "preferred_tasks_patterns": ["паттерн 1", "паттерн 2"], // какие типы задач игрок любит
-      "master_summary": "Текст от лица Мастера (2-3 предложения), резюмирующий поведение игрока, его сильные и слабые стороны на основе этих данных."
+      "master_summary": "Текст от лица Мастера (2-3 предложения) в RPG стиле, резюмирующий поведение игрока, его сильные и слабые стороны."
     }`;
     
     const response = await openai.chat.completions.create({
@@ -362,6 +365,9 @@ export const evaluateTasksBatchWithAI = async (apiKey: string, baseUrl: string, 
     - charisma (Харизма/Дух/Социум: общение, соцсети, помощь)
     - willpower (Воля/Дисциплина: рутина, уборка, неприятные дела)
     
+    TONE OF VOICE:
+    The "gmComment" (if any) MUST be in Russian. Use fantasy RPG language. DO NOT use modern words like "прокрастинация".
+    
     Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
       "results": [
@@ -438,6 +444,9 @@ export const evaluateTaskWithAI = async (apiKey: string, baseUrl: string, model:
     - charisma (Харизма/Дух/Социум: общение, соцсети, помощь)
     - willpower (Воля/Дисциплина: рутина, уборка, неприятные дела)
     
+    TONE OF VOICE:
+    The "gmComment" MUST be in Russian. Use fantasy RPG language. DO NOT use modern words like "прокрастинация", "фрустрация", "мотивация", "депрессия", "выгорание". Instead use words like "оцепенение", "усталость духа", "пепел души".
+
     Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
       "xp": number,
@@ -453,7 +462,7 @@ export const evaluateTaskWithAI = async (apiKey: string, baseUrl: string, model:
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `The player just completed the task: "${taskText}". Current category is ${stat}, but feel free to suggest a better one if it fits the 4 stats strictly.` }
+        { role: 'user', content: `The player just completed the task: "${taskText}". Current category is ${stat}, but feel free to suggest a better one if it fits the 4 stats strictly.\n\nCRITICAL REMINDER FOR THINKING MODELS: You MUST return ONLY a valid JSON object matching the exact structure from the system prompt. Your response MUST contain the "xp", "statXp", "gold", "difficulty", "suggestedStat", and "gmComment" fields.` }
       ],
       response_format: { type: 'json_object' }
     });
@@ -528,7 +537,10 @@ export const regenerateAITown = async (
 
   const response = await openai.chat.completions.create({
     model: model || 'gpt-4o-mini',
-    messages: [{ role: 'system', content: systemPrompt }],
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Regenerate the town now.\n\nCRITICAL REMINDER FOR THINKING MODELS: You MUST return ONLY a valid JSON object matching the exact structure from the system prompt. Your response MUST contain "city_background_prompt" and the "npcs" object.` }
+    ],
     response_format: { type: 'json_object' }
   });
 
@@ -553,6 +565,27 @@ export const generateAICampaign = async (
 ): Promise<{ campaign: import('../App').Campaign, masterTask?: any, newStoryContext: string, newSeasonInfo?: import('../App').HeroChronicle['season_info'] }> => {
   try {
     const openai = getOpenAIClient(apiKey, baseUrl);
+    
+    const esotericThemes = [
+      "Clockwork Inquisitors in a rusted steampunk dystopia",
+      "Sentient Swarms of crystalline moths from the Fey Wild",
+      "A sunken Gothic cathedral ruled by deep-sea horrors",
+      "A floating archipelago of shattered dreams and night terrors",
+      "Flesh-warped alchemists from a quarantined plague city",
+      "Ghostly samurai wandering an eternal ash-filled bamboo forest",
+      "Eldritch cosmic entities trapped inside giant ancient mirrors",
+      "A nomadic cult of cursed blood-mages in a crimson wasteland",
+      "Frost-bitten giants wrapped in cursed iron chains on a frozen peak",
+      "Weeping marble statues that bleed liquid gold and use holy fire",
+      "A parasitic fungal mind controlling dead paladins in a rotting forest",
+      "Fallen valkyries wielding cursed obsidian spears in a stormy abyss",
+      "Carnivorous plant-demons dwelling in a toxic bioluminescent jungle",
+      "Silent executioners made of shadow and stained glass",
+      "Aristocratic vampires ruling a city of eternal masquerade and endless night"
+    ];
+    // Randomly pick a couple of themes to inspire the AI if it is a new season.
+    const randomThemes = esotericThemes.sort(() => Math.random() - 0.5).slice(0, 2);
+
     let nemesisPrompt = "";
     if (nemesisBoss && nemesisBoss.escaped) {
       nemesisPrompt = `The player recently failed to defeat a boss named "${nemesisBoss.name}". This boss has escaped and is now returning as a "Scarred" or "Vengeful" version of themselves. They should be the main boss of this campaign, with higher stats and immunity (multiplier 0.0) to the stat the player used most against them.`;
@@ -577,7 +610,9 @@ export const generateAICampaign = async (
       seasonContext = `
       CRITICAL: You are generating the FIRST campaign of a NEW Season (Story Arc).
       A Season lasts between 2 and 4 campaigns (weeks).
-      You MUST generate a global season setting/biome.
+      You MUST generate a global season setting/biome. To ensure maximum variety, the setting and enemies for this season MUST be heavily inspired by these weird and bizarre dark fantasy themes: 
+      "${randomThemes.join('" OR "')}"
+      Classic fantasy elements like skeletons or bandits are fine as small enemies, but adapt them to fit the bizarre theme (e.g. crystal skeletons or fungi-infested bandits).
       Also generate 5 NPCs for the city/camp (a safe haven for the player).
       CITY RESTRICTIONS:
       - DIVERSITY: Generate a random and balanced mix of genders and races (women, men, elves, dwarves, orcs, tieflings, beastfolk, etc.). Minimum 50% of characters MUST be female. 
@@ -637,10 +672,16 @@ export const generateAICampaign = async (
     const systemPrompt = `You are a Game Master in an RPG habit tracker.
     Create a weekly campaign. The player will face 2-3 mini-bosses (minions) over the week, leading up to a main boss.
     
+    CRITICAL: ENEMY AND THEME VARIETY
+    You MUST create highly original, weird, and bizarre dark fantasy elements. It is perfectly fine to use "Skeletons", "Bandits", or "Goblins" for the minions padding the path, but adapt them to the current bizarre theme. The main boss, however, MUST be a massive creative twist.
+    Examples of good enemies: "A sentient choir of weeping statues", "A plague-doctor made entirely of swarming moths", "An abandoned clockwork inquisitor".
+    Vary the themes drastically (e.g., cosmic horror, fey wilds madness, rusted steampunk ruins, cursed underwater sunken cathedrals).
+
     TONE OF VOICE И СТИЛИСТИКА ТЕКСТА (ВАЖНО):
-    1. Используй качественный, живой литературный русский язык в стиле хорошего фэнтези (Ведьмак, Dragon Age, Baldur's Gate).
+    1. Используй качественный, живой литературный русский язык в стиле хорошего фэнтези (Ведьмак, Dragon Age, Baldur's Gate, Dark Souls, Bloodborne).
     2. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ англицизмы и геймерский сленг. НЕ используй: скилл, левел, квест, рандомный, босс, апгрейд. Заменяй их на: навык, умение, ступень, поручение, задача, чудовище, враг, улучшение.
     3. Текст должен быть естественным, избегай театрального пафоса и деепричастных оборотов.
+    4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ современные психологические термины (прокрастинация, фрустрация, депрессия, мотивация, стресс, выгорание, триггер). Описывай состояния исключительно через фэнтезийные метафоры (оцепенение, порча, тень, отчаяние, пепел души, усталость духа).
 
     ${seasonContext}
     ${nemesisPrompt}
@@ -664,7 +705,7 @@ export const generateAICampaign = async (
         {
           "name": "Mini-boss Name (in Russian)",
           "description": "Description of the mini-boss in Russian.",
-          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this mini-boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
+          "imagePrompt": "A short English prompt for an AI image generator. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. No UI, no text.' Describe weird, bizarre, unique visual aspects of the creature.",
           "avatarEmoji": "🐺",
           "isMiniBoss": true,
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
@@ -689,7 +730,7 @@ export const generateAICampaign = async (
         {
           "name": "Main Boss Name (in Russian)",
           "description": "Epic description of the main boss in Russian.",
-          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this main boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
+          "imagePrompt": "A short English prompt for an AI image generator. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. No UI, no text.' Describe weird, bizarre, unique visual aspects of the boss.",
           "avatarEmoji": "🐉",
           "isMiniBoss": false,
           "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
@@ -731,7 +772,7 @@ export const generateAICampaign = async (
         {
           "name": "Mini-boss Name (in Russian)",
           "description": "Description of the mini-boss in Russian.",
-          "imagePrompt": "A short English prompt for an AI image generator to create a fantasy portrait of this mini-boss. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. The character is placed in a fitting atmospheric background. No UI elements, no text.'",
+          "imagePrompt": "A short English prompt for an AI image generator. MUST INCLUDE: 'Fantasy game art, highly detailed portrait. No UI, no text.' Describe weird, bizarre, unique visual aspects of the creature.",
           "avatarEmoji": "🐺",
           "isMiniBoss": true,
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
@@ -981,7 +1022,7 @@ export const generateAITrophy = async (
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Generate a trophy for defeating ${bossName}.` }
+        { role: 'user', content: `Generate a trophy for defeating ${bossName}.\n\nCRITICAL REMINDER FOR THINKING MODELS: You MUST return ONLY a valid JSON object matching the exact structure from the system prompt.` }
       ],
       response_format: { type: 'json_object' }
     });
@@ -1025,15 +1066,31 @@ export const generateShopItems = async (apiKey: string, baseUrl: string, model: 
   try {
     const openai = getOpenAIClient(apiKey, baseUrl);
     const systemPrompt = `You are a mysterious traveling merchant in an RPG habit tracker.
-    Generate a pool of EXACTLY 10 items for the player to buy with Gold. These items will be used as a pool for the entire campaign.
+    Generate a pool of EXACTLY 10 items for the player to buy with Gold. These items will be used as a shop inventory.
+    They must fit well logically into a dark fantasy/RPG setting and the game mechanics.
+
+    Available effect types:
+    - "damage_boss": Deals direct immediate damage to the current boss (e.g., Bombs, Magic scrolls, Throwing axes). Value: 20 to 150.
+    - "player_xp": Instantly grants experience points to the player (e.g., Tomes of Knowledge, Elixirs of Wisdom). Value: 50 to 300.
+    - "pet_food": Grants experience points to the player's familiar/pet (e.g., Magic Treats, Beast Food). Value: 20 to 100.
+    - "pet_revive": Instantly cures the player's familiar from the 'injured' status (e.g., Phoenix Tear, Healing Salve). Value MUST be 1.
+    - "stat_xp": Instantly boosts a specific stat's XP. You MUST also provide "targetStat" (strength, intelligence, charisma, or willpower). Value: 30 to 150.
+
+    Prices MUST be balanced so the player has to save up for them:
+    - gray (Common): 50 - 150 gold
+    - blue (Rare): 150 - 400 gold
+    - purple (Epic): 400 - 800 gold
+    - gold (Legendary): 800 - 1500 gold
+
     Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
       "items": [
         {
-          "name": "Item Name in Russian",
+          "name": "Item Name in Russian (e.g., Зелье мудрости, Бомба из черного пороха)",
           "lore": "Short lore description in Russian.",
           "effect": {
-            "type": "heal_boss" | "damage_boost" | "xp_boost" | "pet_food",
+            "type": "damage_boss" | "player_xp" | "pet_food" | "pet_revive" | "stat_xp",
+            "targetStat": "strength" | "intelligence" | "charisma" | "willpower", // ONLY IF type is 'stat_xp', otherwise omit or null
             "value": number
           },
           "rarity": "gray" | "blue" | "purple" | "gold",
@@ -1041,13 +1098,13 @@ export const generateShopItems = async (apiKey: string, baseUrl: string, model: 
         }
       ]
     }
-    Prices MUST be very high so the player has to save up for them (e.g., 300 to 2000 gold depending on rarity). Include at least 2-3 items with 'pet_food' type (value should be XP amount for pet, e.g. 10 to 50).`;
+    Make sure to include a good variety of items (at least one of each effect type across the 10 items). Include 2 or 3 pet_food items.`;
 
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Generate shop items for a level ${playerLevel} player.` }
+        { role: 'user', content: `Generate shop items for a level ${playerLevel} player.\n\nCRITICAL REMINDER FOR THINKING MODELS: You MUST return ONLY a valid JSON object matching the exact structure from the system prompt. Make sure targetStat is provided for stat_xp items.` }
       ],
       response_format: { type: 'json_object' }
     });
@@ -1077,7 +1134,7 @@ export const decomposeTaskWithAI = async (apiKey: string, baseUrl: string, model
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Break down this task: "${taskText}"` }
+        { role: 'user', content: `Break down this task: "${taskText}"\n\nCRITICAL REMINDER FOR THINKING MODELS: You MUST return ONLY a valid JSON object matching the exact structure from the system prompt. Your response MUST contain the "subtasks" array.` }
       ],
       response_format: { type: 'json_object' }
     });
@@ -1105,6 +1162,7 @@ export const generateRandomEncounter = async (apiKey: string, baseUrl: string, m
     2. The "task" MUST be a realistic, general real-life habit/action (e.g., fitness, learning, chores, mindfulness). DO NOT give specific, inaccessible fantasy tasks like "Chop wood" or "Hunt an animal". You must translate the RPG fantasy context into a viable real-world activity.
     3. You MUST focus the task primarily on the player's weakest stat: ${weakestStat}.
     4. ${existingStr}
+    5. TONE OF VOICE: DO NOT use modern psychological terms like "прокрастинация", "фрустрация", "стресс", "мотивация". Use fantasy atmosphere descriptions.
 
     Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
@@ -1118,9 +1176,25 @@ export const generateRandomEncounter = async (apiKey: string, baseUrl: string, m
       }
     }`;
 
+    const jsonSchemaReminder = `Return ONLY a valid JSON object with this exact structure, no markdown formatting:
+    {
+      "story": "Micro-story in Russian (e.g., 'Странствующий монах молится у дороги. Если вы присоединитесь к нему, то укрепите свой дух')",
+      "task": "Easy real-life task for today in Russian (e.g., 'Помедитировать 5 минут')",
+      "stat": "strength" | "intelligence" | "charisma" | "willpower",
+      "difficulty": 1 | 2 | 3 | 4 | 5,
+      "buff": {
+        "type": "xp_boost" | "damage_boost",
+        "value": 0.05
+      }
+    }`;
+    const userMessage = `Generate the random daily encounter now.\n\nCRITICAL REMINDER FOR THINKING MODELS: Many reasoning models ignore the system structure. You MUST return ONLY a valid JSON object matching the exact structure below. Your response MUST contain the "story", "task", "stat", "difficulty", and "buff" fields.\n\n${jsonSchemaReminder}`;
+
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
-      messages: [{ role: 'system', content: systemPrompt }],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
       response_format: { type: 'json_object' },
       temperature: 0.95
     });
@@ -1128,10 +1202,14 @@ export const generateRandomEncounter = async (apiKey: string, baseUrl: string, m
     const content = response.choices?.[0]?.message?.content;
     if (!content) throw new Error("Пустой ответ от OpenAI");
 
-    return extractJSON(content);
+    const data = extractJSON(content);
+    if (!data.story || !data.task || !data.stat) {
+      throw new Error("ИИ не вернул полные данные для события (отсутствует story, task или stat).\n\nRAW RESULT:\n" + JSON.stringify(data, null, 2));
+    }
+    return data;
   } catch (error) {
     console.error("[AI Encounter] Error generating encounter:", error);
-    return null;
+    throw error;
   }
 };
 
@@ -1157,7 +1235,10 @@ export const evaluateOathWithAI = async (apiKey: string, baseUrl: string, model:
 
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
-      messages: [{ role: 'system', content: systemPrompt }],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Evaluate the oath now.\n\nCRITICAL REMINDER FOR THINKING MODELS: You MUST return ONLY a valid JSON object matching the exact structure from the system prompt.` }
+      ],
       response_format: { type: 'json_object' }
     });
 

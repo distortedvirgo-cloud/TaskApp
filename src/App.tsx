@@ -109,7 +109,8 @@ export type ShopItem = {
   name: string;
   lore: string;
   effect: {
-    type: 'heal_boss' | 'damage_boost' | 'xp_boost' | 'pet_food';
+    type: 'damage_boss' | 'player_xp' | 'pet_food' | 'pet_revive' | 'stat_xp';
+    targetStat?: 'strength' | 'intelligence' | 'charisma' | 'willpower';
     value: number;
   };
   rarity: 'gray' | 'blue' | 'purple' | 'gold';
@@ -679,7 +680,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     if (!aiSettings.enableImages || !effectiveApiKey) return;
     if (processingImagesRef.current) return;
     
-    const pendingJobs = imageQueue.filter(j => j.status === 'pending');
+    const pendingJobs = imageQueue.filter(j => j.status === 'pending' || (j.status === 'failed' && (j.retryCount || 0) < 3));
     if (pendingJobs.length === 0) return;
 
     const runJobs = async () => {
@@ -753,11 +754,13 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                    return prev;
                 });
               }
+           } else {
+               throw new Error("Empty URL returned for generation");
            }
            setImageQueue(prev => prev.filter(j => j.id !== job.id));
         } catch (e) {
            console.error("Queue Image gen failed for job", job.id, e);
-           setImageQueue(prev => prev.map(j => j.id === job.id ? { ...j, status: 'failed' } : j));
+           setImageQueue(prev => prev.map(j => j.id === job.id ? { ...j, status: 'failed', retryCount: (j.retryCount || 0) + 1 } : j));
         }
       });
 
@@ -3028,13 +3031,14 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
                   return (
                     <>
-                      {activeTasks.length > 0 || pendingTasks.length > 0 ? (
+                      {activeTasks.length > 0 || pendingTasks.length > 0 || finishedTasks.length > 0 ? (
                         <>
                           <h3 className="text-[17px] font-bold text-white mt-2 mb-1">Сегодня</h3>
                           <div className="space-y-3">
                             <AnimatePresence mode="popLayout">
                               {activeTasks.map(t => renderTask(t))}
                               {pendingTasks.map(t => renderTask(t))}
+                              {finishedTasks.map(t => renderTask(t))}
                             </AnimatePresence>
                           </div>
                         </>
@@ -3972,9 +3976,10 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                     'bg-slate-900/30 border border-slate-500/20 text-slate-400'
                   }`}>
                     <span className="filter drop-shadow-[0_0_8px_rgba(168,85,247,0.5)] group-hover:scale-110 transition-transform duration-300">
-                      {item.effect.type === 'heal_boss' ? <Heart size={28} /> :
-                       item.effect.type === 'damage_boost' ? <Sword size={28} /> :
+                      {item.effect.type === 'pet_revive' ? <Heart size={28} /> :
+                       item.effect.type === 'damage_boss' ? <Sword size={28} /> :
                        item.effect.type === 'pet_food' ? <span className="text-3xl drop-shadow-md">🍖</span> :
+                       item.effect.type === 'stat_xp' ? <Flame size={28} /> :
                        <Zap size={28} />}
                     </span>
                   </div>
@@ -3999,9 +4004,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                           if (player.gold >= item.price) {
                             setPlayer(prev => ({ ...prev, gold: prev.gold - item.price }));
                             // Apply effect
-                            if (item.effect.type === 'heal_boss') {
-                              setBoss(prev => prev ? ({ ...prev, hp: Math.min(prev.maxHp, prev.hp + item.effect.value) }) : prev);
-                            } else if (item.effect.type === 'damage_boost') {
+                            if (item.effect.type === 'damage_boss') {
                               setPlayer(prev => ({
                                 ...prev,
                                 pendingDamage: {
@@ -4009,10 +4012,23 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                   strength: prev.pendingDamage.strength + item.effect.value
                                 }
                               }));
-                            } else if (item.effect.type === 'xp_boost') {
+                            } else if (item.effect.type === 'player_xp') {
                               setPlayer(prev => ({ ...prev, xp: prev.xp + item.effect.value }));
                             } else if (item.effect.type === 'pet_food') {
                               feedFamiliar(item.effect.value);
+                            } else if (item.effect.type === 'pet_revive') {
+                              setPlayer(prev => prev.familiar ? { ...prev, familiar: { ...prev.familiar, status: 'active', injuredUntil: undefined } } : prev);
+                            } else if (item.effect.type === 'stat_xp') {
+                              if (item.effect.targetStat) {
+                                const targetStat = item.effect.targetStat;
+                                setPlayer(prev => ({
+                                  ...prev,
+                                  stats: {
+                                    ...prev.stats,
+                                    [targetStat]: { ...prev.stats[targetStat], xp: prev.stats[targetStat].xp + item.effect.value }
+                                  }
+                                }));
+                              }
                             }
                             // Remove item from shop
                             setGameState(prev => ({
