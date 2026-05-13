@@ -677,7 +677,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   const processingImagesRef = useRef(false);
 
   useEffect(() => {
-    if (!aiSettings.enableImages || !effectiveApiKey) return;
+    if (!aiSettings.enableImages || (!effectiveApiKey && !effectiveAiBaseUrl)) return;
     if (processingImagesRef.current) return;
     
     const pendingJobs = imageQueue.filter(j => j.status === 'pending' || (j.status === 'failed' && (j.retryCount || 0) < 3));
@@ -3054,20 +3054,20 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                       
                       {finishedTasks.length > 0 && (
                         <div className="pt-4 mt-2">
+                          <div className="space-y-3">
+                            <AnimatePresence mode="popLayout">
+                              {finishedTasks.map(t => renderTask(t))}
+                            </AnimatePresence>
+                          </div>
                           <button
                             onClick={clearCompleted}
-                            className="flex items-center justify-between w-full mb-3 p-4 text-sm text-purple-300 hover:text-purple-200 bg-[#16122b]/80 transition-colors rounded-[16px] border border-purple-500/20 cursor-pointer shadow-lg"
+                            className="flex items-center justify-between w-full mt-3 mb-3 p-4 text-sm text-purple-300 hover:text-purple-200 bg-[#16122b]/80 transition-colors rounded-[16px] border border-purple-500/20 cursor-pointer shadow-lg"
                           >
                             <span className="font-bold flex items-center gap-2">
                               <span className="text-lg">✨</span> Очистить выполненные
                             </span>
                             <ChevronRight size={16} />
                           </button>
-                          <div className="space-y-3">
-                            <AnimatePresence mode="popLayout">
-                              {finishedTasks.map(t => renderTask(t))}
-                            </AnimatePresence>
-                          </div>
                         </div>
                       )}
                     </>
@@ -3244,22 +3244,40 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                               filter: 'blur(10px)'
                             } : {}}
                             transition={boss.hp <= 0 ? { duration: 1 } : {}}
-                            className="absolute inset-0 w-full h-full flex items-center justify-center"
+                            className="absolute inset-0 w-full h-full flex items-center justify-center group"
                           >
                             {boss.imageUrl ? (
-                              <motion.img 
-                                src={boss.imageUrl} 
-                                alt={boss.name} 
-                                className="w-full h-full object-cover object-[right_top] opacity-80" 
-                                referrerPolicy="no-referrer"
-                                animate={bossHit ? {
-                                  filter: ['brightness(1) contrast(1)', 'brightness(1.5) contrast(1.2)', 'brightness(1) contrast(1)'],
-                                  scale: 1
-                                } : {
-                                  scale: [1, 1.05, 1]
-                                }}
-                                transition={bossHit ? { duration: 0.2 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }}
-                              />
+                              <>
+                                <motion.img 
+                                  src={boss.imageUrl} 
+                                  alt={boss.name} 
+                                  className="w-full h-full object-cover object-[right_top] opacity-80" 
+                                  referrerPolicy="no-referrer"
+                                  animate={bossHit ? {
+                                    filter: ['brightness(1) contrast(1)', 'brightness(1.5) contrast(1.2)', 'brightness(1) contrast(1)'],
+                                    scale: 1
+                                  } : {
+                                    scale: [1, 1.05, 1]
+                                  }}
+                                  transition={bossHit ? { duration: 0.2 } : { duration: 12, repeat: Infinity, ease: "easeInOut" }}
+                                />
+                                {(aiSettings.enableImages !== false && boss.imagePrompt) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setBoss(prev => prev ? { ...prev, imageUrl: undefined } : null);
+                                      setImageQueue(prev => {
+                                          const filtered = prev.filter(j => !(j.type === 'enemy' && j.targetId === boss.id));
+                                          return [...filtered, { id: crypto.randomUUID(), type: 'enemy', targetId: boss.id, prompt: boss.imagePrompt!, aspectRatio: '1:1', status: 'pending', retryCount: 0 }];
+                                      });
+                                    }}
+                                    className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 p-2 bg-[#0B0E14]/80 text-slate-400 hover:text-white rounded-full border border-white/10 transition-all z-10"
+                                    title="Перегенерировать изображение"
+                                  >
+                                    <RefreshCw size={16} />
+                                  </button>
+                                )}
+                              </>
                             ) : boss.imagePrompt ? (
                               (() => {
                                 const bossImageJob = imageQueue.find(j => j.type === 'enemy' && j.targetId === boss.id);

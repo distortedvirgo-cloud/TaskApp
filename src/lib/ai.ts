@@ -6,7 +6,9 @@ export const getOpenAIClient = (apiKey: string, baseUrl?: string) => {
   const isGemini = baseUrl?.includes('generativelanguage.googleapis.com');
   
   if (isGemini) {
-    const ai = new GoogleGenAI({ apiKey: apiKey || 'dummy-key' });
+    // Rely on process.env.GEMINI_API_KEY if no key provided
+    const keyToUse = apiKey || (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) || 'dummy-key';
+    const ai = new GoogleGenAI({ apiKey: keyToUse });
     
     // Return a proxy/wrapper that mocks the minimal OpenAI interface needed by this app
     return {
