@@ -1226,19 +1226,21 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       const now = Date.now();
       const deadline = campaign ? campaign.deadline : boss.expiresAt;
       
-      if (now > deadline && boss.hp > 0) {
+      if (now > deadline && boss.hp > 0 && !isGeneratingBoss && !bossFailed) {
         setBossFailed(true);
         setTimeLeft('Время вышло!');
-      } else {
+      } else if (now <= deadline) {
         const diff = deadline - now;
         const days = Math.floor(diff / (1000 * 60 * 60 * 24));
         const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
         const minutes = Math.floor((diff / 1000 / 60) % 60);
         setTimeLeft(`${days}д ${hours}ч ${minutes}м`);
+      } else {
+        setTimeLeft('Время вышло!');
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [boss, campaign]);
+  }, [boss, campaign, isGeneratingBoss, bossFailed]);
 
   const gainRewards = (xpAmount: number, damageAmount: number, stat: StatType, statXpAmount: number, isDaily: boolean, goldAmount: number = 0) => {
     setPlayer(prev => {
@@ -1687,6 +1689,9 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     }));
     setGmMessage(`Вы потерпели поражение и потеряли один уровень.`);
     setCampaign(null);
+    if (boss) {
+      setBoss({ ...boss, hp: 0, escaped: true });
+    }
     
     if (effectiveApiKey || effectiveAiBaseUrl) {
       handleTestGenerateBoss(newNemesis || undefined);
@@ -3329,9 +3334,47 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 }
                               })()
                             ) : boss.avatarEmoji ? (
-                              <span className="text-8xl drop-shadow-2xl">{boss.avatarEmoji}</span>
+                              <div className="flex flex-col items-center justify-center gap-4 relative z-10">
+                                <span className="text-8xl drop-shadow-2xl">{boss.avatarEmoji}</span>
+                                {(aiSettings.enableImages !== false) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const constructedPrompt = boss.imagePrompt || `A 2D fantasy game card character portrait of ${boss.name}, ${boss.description}. Epic mythology creature, highly detailed dark fantasy illustration style, isolated object on clean black background, no text.`;
+                                      setBoss(prev => prev ? { ...prev, imagePrompt: constructedPrompt } : null);
+                                      setImageQueue(prev => {
+                                          const filtered = prev.filter(j => !(j.type === 'enemy' && j.targetId === boss.id));
+                                          return [...filtered, { id: crypto.randomUUID(), type: 'enemy', targetId: boss.id, prompt: constructedPrompt, aspectRatio: '1:1', status: 'pending', retryCount: 0 }];
+                                      });
+                                    }}
+                                    className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/30 rounded-xl text-xs font-semibold transition-all shadow-lg hover:shadow-purple-500/10 cursor-pointer flex items-center gap-1.5 active:scale-95 z-20"
+                                  >
+                                    <Bot size={13} />
+                                    Призвать облик
+                                  </button>
+                                )}
+                              </div>
                             ) : (
-                              <Skull size={80} className="text-slate-500" />
+                              <div className="flex flex-col items-center justify-center gap-4 relative z-10">
+                                <Skull size={80} className="text-slate-500 animate-pulse" />
+                                {(aiSettings.enableImages !== false) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const constructedPrompt = boss.imagePrompt || `A 2D fantasy game card character portrait of ${boss.name}, ${boss.description}. Epic mythology creature, highly detailed dark fantasy illustration style, isolated object on clean black background, no text.`;
+                                      setBoss(prev => prev ? { ...prev, imagePrompt: constructedPrompt } : null);
+                                      setImageQueue(prev => {
+                                          const filtered = prev.filter(j => !(j.type === 'enemy' && j.targetId === boss.id));
+                                          return [...filtered, { id: crypto.randomUUID(), type: 'enemy', targetId: boss.id, prompt: constructedPrompt, aspectRatio: '1:1', status: 'pending', retryCount: 0 }];
+                                      });
+                                    }}
+                                    className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/30 rounded-xl text-xs font-semibold transition-all shadow-lg hover:shadow-purple-500/10 cursor-pointer flex items-center gap-1.5 active:scale-95 z-20"
+                                  >
+                                    <Bot size={13} />
+                                    Призвать облик
+                                  </button>
+                                )}
+                              </div>
                             )}
                             
                             {/* Gradient Overlay for Text Readability */}
