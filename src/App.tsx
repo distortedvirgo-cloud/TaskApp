@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sword, CheckCircle, Circle, Plus, Trash2, Trophy, Skull, User, Flame, Target, Shield, Book, Heart, Zap, Clock, AlertCircle, Settings, Bot, X, Loader2, RefreshCw, AlertTriangle, Download, HelpCircle, ChevronUp, ChevronDown, ChevronRight, Eye, ShoppingBag, Coins, Map, Store, Tent, Dna, Compass, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics, regenerateAITown } from './lib/ai';
+import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics, regenerateAITown, generateChronicleVictory } from './lib/ai';
 import { NPCModal } from './components/NPCModal';
 
 export type StatType = 'strength' | 'intelligence' | 'charisma' | 'willpower' | 'unknown';
@@ -130,6 +130,19 @@ export type Trophy = {
     value: number;
   };
 };
+
+export interface MasterQuest {
+  stat: StatType;
+  target: number;
+  current: number;
+}
+
+export interface ChronicleVictory {
+  title: string;
+  story: string;
+  imagePrompt: string;
+  imageUrl?: string;
+}
 
 export type HeroChronicle = {
   season_info?: {
@@ -626,6 +639,28 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     }
   });
 
+  const [masterQuest, setMasterQuest] = useState<MasterQuest | null>(() => {
+    try {
+      const saved = localStorage.getItem('questlog_master_quest');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const [chronicleVictory, setChronicleVictory] = useState<ChronicleVictory | null>(() => {
+    try {
+      const saved = localStorage.getItem('questlog_chronicle_victory');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    safeStorageSet('questlog_master_quest', masterQuest ? JSON.stringify(masterQuest) : '');
+  }, [masterQuest]);
+
+  useEffect(() => {
+    safeStorageSet('questlog_chronicle_victory', chronicleVictory ? JSON.stringify(chronicleVictory) : '');
+  }, [chronicleVictory]);
+
   const [showSettings, setShowSettings] = useState(false);
   const [showFinishedTasks, setShowFinishedTasks] = useState(false);
   const [gmMessage, setGmMessage] = useState<string | null>(null);
@@ -647,7 +682,37 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     safeStorageSet('questlog_encounter_cache', JSON.stringify(encounterCache));
   }, [encounterCache]);
 
+  useEffect(() => {
+    if (activeTab !== 'boss') return;
+    if (masterQuest) return;
+
+    const statsToCheck: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
+    const levels = statsToCheck.map(s => player.stats[s]?.level || 1);
+    const maxLevel = Math.max(...levels);
+    const minLevel = Math.min(...levels);
+
+    if (maxLevel - minLevel >= 2) {
+      const minIndices: number[] = [];
+      levels.forEach((lvl, idx) => {
+        if (lvl === minLevel) {
+          minIndices.push(idx);
+        }
+      });
+      const neglectedIndex = minIndices[Math.floor(Math.random() * minIndices.length)];
+      const stat = statsToCheck[neglectedIndex];
+
+      const newQuest: MasterQuest = {
+        stat,
+        target: 30,
+        current: 0
+      };
+      setMasterQuest(newQuest);
+      setGmMessage(`Мастер: "Твоя тренировка несбалансирована! Ты сильно пренебрегаешь характеристикой ${STATS[stat]?.name || stat}. Я заблокировал логово босса. Выполни мои указания и восстанови баланс!"`);
+    }
+  }, [activeTab, player.stats, masterQuest]);
+
   const processingEncounterRef = useRef(false);
+  const preGeneratingChronicleRef = useRef(false);
   useEffect(() => {
     if (!aiSettings.enableImages || !effectiveApiKey) return; // if AI is off, no events
     if (processingEncounterRef.current) return;
@@ -734,6 +799,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                       }
                    };
                 });
+              } else if (job.type === 'chronicle_victory') {
+                setChronicleVictory(prev => prev ? { ...prev, imageUrl: url } : null);
               } else if (job.type === 'enemy') {
                 setCampaign(prev => {
                    if (!prev) return prev;
@@ -1319,6 +1386,18 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         }
       };
     });
+
+    if (masterQuest && masterQuest.stat === stat) {
+      setMasterQuest(prev => {
+        if (!prev) return null;
+        const pointsAdded = 10;
+        const nextCurrent = Math.min(prev.target, prev.current + pointsAdded);
+        if (nextCurrent >= prev.target && prev.current < prev.target) {
+          setGmMessage(`Мастер: "Великолепная работа! Твое Испытание Баланса завершено. Сила характеристики ${STATS[stat].name} восстановлена. Ты готов сразиться с боссом!"`);
+        }
+        return { ...prev, current: nextCurrent };
+      });
+    }
   };
 
   const handleAutoCategorizeTasks = async () => {
@@ -1626,6 +1705,56 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     
     damageDealt = Math.floor(damageDealt);
 
+    // Pre-generate victory chronicle when boss hp falls to 20% or less
+    const projectedHp = Math.max(0, boss.hp - damageDealt);
+    const isCampaignFinished = campaign && campaign.currentEnemyIndex >= campaign.enemies.length - 1;
+    if (isCampaignFinished && projectedHp <= boss.maxHp * 0.2 && !chronicleVictory && !preGeneratingChronicleRef.current) {
+      preGeneratingChronicleRef.current = true;
+      (async () => {
+        if (effectiveApiKey || effectiveAiBaseUrl) {
+          try {
+            const victoryChronicle = await generateChronicleVictory(
+              effectiveApiKey,
+              effectiveAiBaseUrl,
+              effectiveAiModel,
+              boss.name,
+              campaign ? campaign.title : 'Неизвестная Земля',
+              player.playerClass || 'Герой',
+              player.stats
+            );
+            if (victoryChronicle) {
+              const savedChronicle: ChronicleVictory = {
+                title: victoryChronicle.title,
+                story: victoryChronicle.story,
+                imagePrompt: victoryChronicle.medievalImagePrompt,
+              };
+              setChronicleVictory(savedChronicle);
+              
+              const chronicleJob: any = {
+                id: crypto.randomUUID(),
+                type: 'chronicle_victory',
+                targetId: 'chronicle_victory',
+                prompt: victoryChronicle.medievalImagePrompt,
+                aspectRatio: '1:1',
+                status: 'pending',
+                retryCount: 0
+              };
+              setImageQueue(prev => [...prev, chronicleJob]);
+            }
+          } catch (err) {
+            console.error("Failed to pregenerate chronicle victory in background", err);
+            preGeneratingChronicleRef.current = false;
+          }
+        } else {
+          setChronicleVictory({
+            title: `Свержение ${boss.name}`,
+            story: `Великий триумф свершился! Доблестный ${player.playerClass || 'Герой'} превозмог все испытания и одолел Владыку по имени ${boss.name}, принеся вечный мир в эти земли. Хроники вечно будут хранить память об этом подвиге.`,
+            imagePrompt: ""
+          });
+        }
+      })();
+    }
+
     if (boss.banter && boss.banter[maxStat]) {
       setGmMessage(`Босс: "${boss.banter[maxStat]}"`);
     }
@@ -1785,6 +1914,57 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       setGameState(prev => ({ ...prev, defeatedBosses: newDefeated }));
       setIsGeneratingBoss(false);
       return;
+    }
+
+    // Generate chronicle victory first if not already pre-generated
+    if (isCampaignFinished) {
+      if (!chronicleVictory) {
+        if (effectiveApiKey || effectiveAiBaseUrl) {
+           try {
+              const victoryChronicle = await generateChronicleVictory(
+                 effectiveApiKey,
+                 effectiveAiBaseUrl,
+                 effectiveAiModel,
+                 boss.name,
+                 campaign ? campaign.title : 'Неизвестная Земля',
+                 player.playerClass || 'Герой',
+                 player.stats
+              );
+              if (victoryChronicle) {
+                 const savedChronicle: ChronicleVictory = {
+                    title: victoryChronicle.title,
+                    story: victoryChronicle.story,
+                    imagePrompt: victoryChronicle.medievalImagePrompt,
+                 };
+                 setChronicleVictory(savedChronicle);
+                 
+                 const chronicleJob: any = {
+                   id: crypto.randomUUID(),
+                   type: 'chronicle_victory',
+                   targetId: 'chronicle_victory',
+                   prompt: victoryChronicle.medievalImagePrompt,
+                   aspectRatio: '1:1',
+                   status: 'pending',
+                   retryCount: 0
+                 };
+                 setImageQueue(prev => [...prev, chronicleJob]);
+              }
+           } catch (err) {
+              console.error("Failed to generate chronicle victory", err);
+              setChronicleVictory({
+                 title: `Свержение ${boss.name}`,
+                 story: `Великий триумф свершился! Доблестный ${player.playerClass || 'Герой'} превозмог все испытания и одолел Владыку по имени ${boss.name}, принеся вечный мир в эти земли. Хроники вечно будут хранить память об этом подвиге.`,
+                 imagePrompt: ""
+              });
+           }
+        } else {
+           setChronicleVictory({
+              title: `Свержение ${boss.name}`,
+              story: `Великий триумф свершился! Доблестный ${player.playerClass || 'Герой'} превозмог все испытания и одолел Владыку по имени ${boss.name}, принеся вечный мир в эти земли. Хроники вечно будут хранить память об этом подвиге.`,
+              imagePrompt: ""
+           });
+        }
+      }
     }
 
     // Campaign finished or no campaign, generate new one
@@ -2270,6 +2450,83 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                 >
                   Принять поражение
                 </button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+         {/* Chronicle Victory Modal (Medieval Parchment) */}
+        <AnimatePresence>
+          {chronicleVictory && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[1100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 50 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 50 }}
+                transition={{ type: "spring", damping: 25, stiffness: 120 }}
+                className="max-w-[500px] w-full relative bg-[#F4E6C3] border-[12px] border-[#3D2513] text-[#2B1B10] p-6 md:p-10 rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] overflow-hidden font-serif border-double ring-4 ring-amber-500/20"
+              >
+                {/* Vintage paper fiber lines/accents */}
+                <div className="absolute inset-0 opacity-[0.06] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-amber-900 via-transparent to-transparent pointer-events-none"></div>
+                <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-[#EAD49E] blur-xl opacity-30 pointer-events-none"></div>
+                <div className="absolute -bottom-10 -right-10 w-24 h-24 rounded-full bg-[#EAD49E] blur-xl opacity-30 pointer-events-none"></div>
+
+                {/* Wax seal effect or ribbon header */}
+                <div className="text-center border-b-2 border-[#5C1D1A]/20 pb-4 mb-5 shrink-0">
+                  <span className="text-[10px] md:text-xs uppercase tracking-[4px] font-sans font-black text-[#5C1D1A] opacity-80">
+                    Персональные Хроники Победы
+                  </span>
+                  <h2 className="text-2xl md:text-3xl font-black text-[#5C1D1A] leading-tight tracking-normal mt-2">
+                    {chronicleVictory.title}
+                  </h2>
+                </div>
+
+                {/* Medieval victory image section inside Gothic gold arch */}
+                <div className="relative w-full aspect-square max-w-[280px] mx-auto rounded-2xl overflow-hidden shadow-2xl border-4 border-[#3D2513] ring-4 ring-amber-500/10 mb-6 bg-[#E9DCC0] flex items-center justify-center">
+                  {chronicleVictory.imageUrl ? (
+                    <img 
+                      src={chronicleVictory.imageUrl} 
+                      alt="Boss Defeat" 
+                      className="w-full h-full object-cover select-none animate-fade-in"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-4 text-center px-6 relative z-10 text-[#5C1D1A]/70">
+                      <Loader2 size={36} className="animate-spin text-[#5C1D1A] opacity-80" />
+                      <div className="space-y-1">
+                        <span className="text-[11px] uppercase tracking-[2px] font-sans font-bold block">Летописец трудится</span>
+                        <p className="text-[10px] text-[#2B1B10]/60 italic font-serif leading-snug">
+                          Запечатлеваем ваш великий триумф на века...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Story description on parchment paper */}
+                <div className="space-y-4 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar text-center">
+                  <p className="text-sm md:text-base leading-relaxed text-[#3D2C1E] font-medium tracking-wide italic leading-7">
+                    « {chronicleVictory.story} »
+                  </p>
+                </div>
+
+                {/* Close/Proceed scroll seal button */}
+                <div className="pt-6 text-center">
+                  <button
+                    onClick={() => {
+                      setChronicleVictory(null);
+                      preGeneratingChronicleRef.current = false;
+                    }}
+                    className="px-8 py-3 bg-[#5C1D1A] hover:bg-[#722421] text-[#F4E6C3] font-bold text-xs uppercase tracking-[2px] rounded-xl shadow-lg border-2 border-amber-950/20 active:scale-95 transition-all cursor-pointer font-sans"
+                  >
+                    Запечатать Свиток
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -3081,7 +3338,95 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
           {activeTab === 'boss' && (
             <div className="flex flex-col flex-1 space-y-3 min-h-full">
-              {isGeneratingBoss ? (
+              {masterQuest ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[50vh]">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-full max-w-md bg-[#131824] border border-[#3D2513]/40 rounded-3xl p-6 shadow-2xl relative overflow-hidden text-center self-center"
+                  >
+                    <div 
+                      className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-48 rounded-full blur-[80px] opacity-10 pointer-events-none"
+                      style={{ backgroundColor: STATS[masterQuest.stat]?.hex || '#F59E0B' }}
+                    />
+                    
+                    <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: STATS[masterQuest.stat]?.hex || '#F59E0B' }} />
+
+                    <div className="relative w-20 h-20 mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[#0B0E14] border-2 border-white/5 shadow-inner">
+                      <div className="absolute inset-0 rounded-2xl opacity-10 blur-[8px] animate-pulse" style={{ backgroundColor: STATS[masterQuest.stat]?.hex }} />
+                      <Bot size={40} className="text-amber-500 relative z-10" />
+                    </div>
+
+                    <h2 className="text-xl font-black text-slate-100 uppercase tracking-wider mb-1">
+                      Испытание Мастера
+                    </h2>
+                    <span 
+                      className="text-xs font-bold uppercase tracking-[0.16em] py-1 px-3.5 rounded-full bg-white/5 border border-white/10"
+                      style={{ color: STATS[masterQuest.stat]?.hex }}
+                    >
+                      Пренебрежение: {STATS[masterQuest.stat]?.name}
+                    </span>
+
+                    <p className="text-sm text-slate-400 mt-4 leading-relaxed max-w-xs mx-auto text-center font-sans">
+                      Мастер заблокировал логово босса! Твоя подготовка несбалансирована — ты забросил тренировку характеристики <span className="font-bold text-slate-200">{STATS[masterQuest.stat]?.name}</span>.
+                    </p>
+
+                    <div className="mt-6 p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10 text-left space-y-3 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-3 opacity-15">
+                        {React.createElement(STATS[masterQuest.stat]?.icon || HelpCircle, { size: 64, style: { color: STATS[masterQuest.stat]?.hex } })}
+                      </div>
+                      <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-amber-500 block">Задание Мастера:</span>
+                      <p className="text-xs text-slate-300 leading-relaxed font-sans pr-8">
+                        Выполняй задачи по характеристике <strong className="text-slate-200">{STATS[masterQuest.stat]?.name}</strong>. Каждая завершенная задача добавляет <strong className="text-slate-100">+10 очков</strong> к восстановлению баланса.
+                      </p>
+                    </div>
+
+                    <div className="mt-6 space-y-2 text-left">
+                      <div className="flex justify-between items-center text-xs text-slate-400 font-bold px-1">
+                        <span>Прогресс Испытания</span>
+                        <span style={{ color: STATS[masterQuest.stat]?.hex }}>{masterQuest.current} / {masterQuest.target} Очков</span>
+                      </div>
+                      
+                      <div className="h-3 w-full bg-black/50 rounded-full overflow-hidden border border-white/5 p-[2px]">
+                        <motion.div
+                          className="h-full rounded-full"
+                          style={{ 
+                            backgroundColor: STATS[masterQuest.stat]?.hex,
+                            boxShadow: `0 0 12px ${STATS[masterQuest.stat]?.hex || '#F59E0B'}80`
+                          }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(masterQuest.current / masterQuest.target) * 100}%` }}
+                          transition={{ type: "spring", stiffness: 60 }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-8">
+                      {masterQuest.current >= masterQuest.target ? (
+                        <button
+                          onClick={() => {
+                            import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                            setPlayer(prev => ({
+                              ...prev,
+                              gold: (prev.gold || 0) + 50,
+                              xp: prev.xp + 150
+                            }));
+                            setMasterQuest(null);
+                            setGmMessage(`Мастер: "Великолепно! Ты доказал свое усердие и усвоил урок. Доступ к логову босса вновь открыт!"`);
+                          }}
+                          className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 font-black text-slate-950 text-xs uppercase tracking-[2px] rounded-xl hover:from-emerald-400 hover:to-teal-400 transition-all duration-300 active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)] cursor-pointer"
+                        >
+                          Завершить Испытание (+150 XP, +50 Золота)
+                        </button>
+                      ) : (
+                        <div className="w-full py-3.5 bg-white/5 border border-white/10 opacity-60 text-slate-400 font-black text-xs uppercase tracking-[2px] rounded-xl font-sans select-none">
+                          Доступ заблокирован испытанием
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
+              ) : isGeneratingBoss ? (
                 <div className="flex-1 flex flex-col items-center justify-center space-y-6 min-h-[50vh] px-8">
                   <div className="relative">
                     <Loader2 size={48} className="animate-spin text-amber-500 mx-auto opacity-50" />

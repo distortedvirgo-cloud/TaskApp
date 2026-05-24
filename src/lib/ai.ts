@@ -1254,3 +1254,70 @@ export const evaluateOathWithAI = async (apiKey: string, baseUrl: string, model:
   }
 };
 
+export const generateChronicleVictory = async (
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  bossName: string,
+  campaignTitle: string,
+  playerClass: string,
+  playerStats: any
+): Promise<{ title: string; story: string; medievalImagePrompt: string } | null> => {
+  try {
+    const openai = getOpenAIClient(apiKey, baseUrl);
+
+    // Find favorite/strongest stat for lore personalization
+    const statsToCheck = ['strength', 'intelligence', 'charisma', 'willpower'];
+    let bestStat = 'strength';
+    let maxLvl = 0;
+    statsToCheck.forEach(s => {
+      const lvl = playerStats[s]?.level || 1;
+      if (lvl > maxLvl) {
+        maxLvl = lvl;
+        bestStat = s;
+      }
+    });
+
+    const statNames: any = {
+      strength: "Сила физического тела",
+      intelligence: "Острота ума и знаний",
+      charisma: "Обаяние и красноречие",
+      willpower: "Непоколебимая Воля и Дух"
+    };
+
+    const systemPrompt = `You are a high-fantasy chronicler writing in a glorious, immersive medieval chronicle style.
+    The player has defeated the final campaign boss: "${bossName}" in the campaign titled "${campaignTitle}".
+    The player's class is "${playerClass}". Their outstanding characteristic is "${statNames[bestStat] || 'strength'}".
+    
+    Write an epic, beautiful victory chronicle entry (under 4-5 sentences, in Russian) detailing this spectacular win. Emphasize their class ("${playerClass}") and how their core mastery ("${statNames[bestStat]}") played a decisive role in shattering "${bossName}". Make it sound legendary, worthy of a medieval parchment scroll.
+
+    Also, generate a highly detailed prompt in English (medievalImagePrompt) for an AI image generator to illustrate this victory.
+    The image prompt MUST describe a beautiful medieval art style:
+    "A stylized medieval manuscript illumination / medieval woodcut / tapestry art, [playerClass] overcoming the defeated [bossName], dark fantasy elements, golden light, framed by an ornate medieval celtic border, aged parchment paper texture background" (include the specifics of the fight to make it gorgeous!).
+
+    Return ONLY a valid JSON object, with no markdown formatting:
+    {
+      "title": "A glorious medieval name for the chronicle entry in Russian (e.g., Свержение Владыки Теней)",
+      "story": "Detailed majestic story paragraph in Russian.",
+      "medievalImagePrompt": "Detailed English image prompt in medieval style to feed into the image generator."
+    }`;
+
+    const response = await openai.chat.completions.create({
+      model: model || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Write a chronicle entry of the triumph over ${bossName}.\n\nCRITICAL REMINDER FOR THINKING MODELS: You must return ONLY a valid JSON object matching the exact structure from the system prompt.` }
+      ],
+      response_format: { type: 'json_object' }
+    });
+
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response from AI");
+
+    return extractJSON(content);
+  } catch (error) {
+    console.error("[AI Chronicle Victory] Error:", error);
+    return null;
+  }
+};
+
