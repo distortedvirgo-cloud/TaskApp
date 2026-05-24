@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X } from 'lucide-react';
+import { X, ShoppingBag, Eye, Flame, Dna, Compass } from 'lucide-react';
 
 interface NPCModalProps {
   isOpen: boolean;
@@ -15,6 +15,14 @@ interface NPCModalProps {
   footer?: React.ReactNode;
   leftAlignHeader?: boolean;
 }
+
+const NPC_ICONS = {
+  shop: ShoppingBag,
+  fortune: Eye,
+  altar: Flame,
+  beast: Dna,
+  expedition: Compass
+};
 
 const THEMES = {
   purple: {
@@ -111,31 +119,57 @@ export const NPCModal: React.FC<NPCModalProps> = ({
             onClick={e => e.stopPropagation()}
           >
             {/* Background Image Area */}
-            <div className="absolute inset-0 z-0">
-              {imageUrl ? (
-                <img 
-                  src={imageUrl} 
-                  alt={npcData.name} 
-                  className="w-full h-full object-cover object-[100%_15%] opacity-85"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="w-full h-full opacity-70 bg-[#050A0F] flex items-center justify-center -mt-32">
-                   <div className="flex flex-col items-center gap-4 text-white/30 animate-pulse">
-                     <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
-                           <div className={`w-2 h-2 rounded-full ${t.bg} shadow-[0_0_10px_currentColor]`} />
-                        </div>
-                     </div>
-                     <span className="text-xs uppercase tracking-[3px] font-mono">Призыв видения...</span>
-                   </div>
-                </div>
-              )}
-              {/* Refined Gradient requested by user */}
+            <div className="absolute inset-x-0 top-0 h-[40vh] sm:h-[35vh] z-0 overflow-hidden flex items-center justify-center p-4 bg-gradient-to-b from-[#050A0F] to-[#0B0E14] select-none pointer-events-none">
+              {/* Radial glow background */}
+              <div 
+                className="absolute w-72 h-72 rounded-full blur-3xl opacity-20 pointer-events-none animate-[pulse_6s_ease-in-out_infinite]"
+                style={{
+                  background: themeColor === 'purple' ? 'radial-gradient(circle, rgba(168,85,247,0.8) 0%, transparent 70%)' :
+                              themeColor === 'fuchsia' ? 'radial-gradient(circle, rgba(217,70,239,0.8) 0%, transparent 70%)' :
+                              themeColor === 'rose' ? 'radial-gradient(circle, rgba(244,63,94,0.8) 0%, transparent 70%)' :
+                              themeColor === 'emerald' ? 'radial-gradient(circle, rgba(16,185,129,0.8) 0%, transparent 70%)' :
+                                                        'radial-gradient(circle, rgba(59,130,246,0.8) 0%, transparent 70%)'
+                }}
+              />
+              
+              {/* Floating, glowing master icon */}
+              {(() => {
+                const IconComponent = NPC_ICONS[npcId] || Compass;
+                return (
+                  <motion.div
+                    animate={{ 
+                      y: [0, -8, 0],
+                      scale: [1, 1.02, 1],
+                      filter: [
+                        'drop-shadow(0 0 20px rgba(0,0,0,0.5))',
+                        `drop-shadow(0 0 35px var(--icon-shadow-color))`,
+                        'drop-shadow(0 0 20px rgba(0,0,0,0.5))'
+                      ]
+                    }}
+                    style={{
+                      ['--icon-shadow-color' as any]: themeColor === 'purple' ? 'rgba(168,85,247,0.3)' :
+                                                      themeColor === 'fuchsia' ? 'rgba(217,70,239,0.3)' :
+                                                      themeColor === 'rose' ? 'rgba(244,63,94,0.3)' :
+                                                      themeColor === 'emerald' ? 'rgba(16,185,129,0.3)' :
+                                                                                'rgba(59,130,246,0.3)'
+                    }}
+                    transition={{ 
+                      duration: 5, 
+                      repeat: Infinity, 
+                      ease: "easeInOut" 
+                    }}
+                    className={`relative z-10 p-5 rounded-full bg-black/40 border border-white/5 flex items-center justify-center ${t.text}`}
+                  >
+                    <IconComponent size={64} className="stroke-[1.5]" />
+                  </motion.div>
+                );
+              })()}
+
+              {/* Refined Gradient overlay to transition smoothly to content */}
               <div 
                 className="absolute inset-0 z-10 pointer-events-none" 
                 style={{ 
-                  background: 'linear-gradient(to bottom, transparent 0%, rgba(5,10,15,0.85) 40%, #050a0f 100%)' 
+                  background: 'linear-gradient(to bottom, transparent 0%, rgba(11, 14, 20, 0.4) 60%, #0B0E14 100%)' 
                 }} 
               />
             </div>

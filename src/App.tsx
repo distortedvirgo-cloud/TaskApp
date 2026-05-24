@@ -1831,13 +1831,6 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         if (aiCampaign.newSeasonInfo?.city_background_prompt && !aiCampaign.newSeasonInfo.city_background_url) {
           newQueueJobs.push({ id: crypto.randomUUID(), type: 'city', targetId: 'city', prompt: aiCampaign.newSeasonInfo.city_background_prompt, aspectRatio: '9:16', status: 'pending', retryCount: 0 });
         }
-        if (aiCampaign.newSeasonInfo?.npcs) {
-          Object.entries(aiCampaign.newSeasonInfo.npcs).forEach(([key, npc]) => {
-            if (npc.imagePrompt && !npc.imageUrl) {
-              newQueueJobs.push({ id: crypto.randomUUID(), type: 'npc', targetId: key, prompt: npc.imagePrompt, aspectRatio: '3:4', status: 'pending', retryCount: 0 });
-            }
-          });
-        }
         
         setGenerationProgress(80);
         setGenerationStep('Призыв сущности...');
@@ -1981,13 +1974,6 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       if (aiCampaign.newSeasonInfo?.city_background_prompt && !aiCampaign.newSeasonInfo.city_background_url) {
         newQueueJobs.push({ id: crypto.randomUUID(), type: 'city', targetId: 'city', prompt: aiCampaign.newSeasonInfo.city_background_prompt, aspectRatio: '9:16', status: 'pending', retryCount: 0 });
       }
-      if (aiCampaign.newSeasonInfo?.npcs) {
-        Object.entries(aiCampaign.newSeasonInfo.npcs).forEach(([key, npc]) => {
-          if (npc.imagePrompt && !npc.imageUrl) {
-            newQueueJobs.push({ id: crypto.randomUUID(), type: 'npc', targetId: key, prompt: npc.imagePrompt, aspectRatio: '3:4', status: 'pending', retryCount: 0 });
-          }
-        });
-      }
       
       setGenerationProgress(80);
       setGenerationStep('Призыв сущности...');
@@ -2086,14 +2072,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
            npcsRaw = townData.npcs;
         }
 
-        const npcsList = Object.entries(npcsRaw);
         const newQueueJobs: ImageJob[] = [];
-
-        for (const [key, npc] of npcsList) {
-            if (npc.imagePrompt) {
-               newQueueJobs.push({ id: crypto.randomUUID(), type: 'npc', targetId: key, prompt: npc.imagePrompt, aspectRatio: '3:4', status: 'pending', retryCount: 0 });
-            }
-        }
 
         if (townData && townData.city_background_prompt) {
             newQueueJobs.push({ id: crypto.randomUUID(), type: 'city', targetId: 'city', prompt: townData.city_background_prompt, aspectRatio: '9:16', status: 'pending', retryCount: 0 });
@@ -3259,7 +3238,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 <motion.img 
                                   src={boss.imageUrl} 
                                   alt={boss.name} 
-                                  className="w-full h-full object-cover object-[right_top] opacity-80" 
+                                  className="w-full h-full object-cover object-center opacity-80" 
                                   referrerPolicy="no-referrer"
                                   animate={bossHit ? {
                                     filter: ['brightness(1) contrast(1)', 'brightness(1.5) contrast(1.2)', 'brightness(1) contrast(1)'],
