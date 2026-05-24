@@ -1402,3 +1402,200 @@ export const generateMasterBalanceTasks = async (
   }
 };
 
+export const generateBossDamageBanter = async (
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  bossName: string,
+  bossDescription: string,
+  statType: StatType,
+  damageDealt: number
+): Promise<string> => {
+  try {
+    if (!apiKey) throw new Error("API Key configuration missing");
+    const openai = getOpenAIClient(apiKey, baseUrl);
+
+    const statTranslate: Record<string, string> = {
+      strength: "Сила / Физическая атака",
+      intelligence: "Интеллект / Магия разума",
+      charisma: "Харизма / Ментальное влияние",
+      willpower: "Сила Воли / Духовное превозмогание"
+    };
+
+    const systemPrompt = `You are the Boss named "${bossName}" in a dark fantasy RPG habit tracker.
+    The description of you is: "${bossDescription}".
+    
+    The player just struck you using their aspect of: "${statTranslate[statType] || statType}".They dealt ${damageDealt} damage.
+    Write a short, dramatic, characteristic hurt exclamation, roar, threat, or grunt in Russian.
+    
+    IMPORTANT RULES:
+    1. It MUST be short (maximum 1-2 short sentences, 5 to 15 words).
+    2. Write only from the perspective of the boss "${bossName}" in Russian. Give him a unique flavor compatible with his description (e.g., watery motifs for Leviathan, shadows/light for Amaterasu, pride/fangs for Fenrir).
+    3. Do NOT mention the damage number directly unless it makes organic poetic sense. Do not use modern words. Keep the tone epic, medieval, monstrous, or fierce.
+    4. Return ONLY the spoken line, no quote marks, no "Boss:", no prefix. Just the live speech like "Р-р-рааа! Ты не выдержишь натиска древних глубин!"`;
+
+    const response = await openai.chat.completions.create({
+      model: model || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Generate damage banter phrase for a hit of type "${statType}".` }
+      ],
+      temperature: 0.8
+    });
+
+    const reply = response.choices?.[0]?.message?.content?.trim();
+    if (reply) {
+      // Clean up common quotes or prefixes
+      return reply.replace(/^["'«“]|["'»”]$/g, '').replace(/^(Босс|Враг|Boss):\s*/i, '').trim();
+    }
+    throw new Error("No response content");
+  } catch (error) {
+    console.warn("[AI Boss Banter] Using fallback damage banter:", error);
+    
+    const lowerName = bossName.toLowerCase();
+    const fallbacks: Record<string, string[]> = {
+      "левиафан": [
+        "Р-р-рааа! Древние пучины поглотят твою дерзость!",
+        "Волны бьются о сталь... Твой удар — лишь капля в моем бесконечном море!",
+        "Вода вокруг закипает от твоей ярости, ничтожный смертный!"
+      ],
+      "аматерасу": [
+        "Глупец, ты пытаешься затмить свет самого небесного светила?!",
+        "Тьма сгущается вокруг тех, кто дерзает поднять руку на божество!",
+        "Мое великое сияние выжжет твою самоуверенность дотла!"
+      ],
+      "ёрмунганд": [
+        "Х-х-ссс! Великое кольцо времени сжимается, тебе не уйти!",
+        "Моя чешуя видела закаты целых миров, твои потуги жалки!",
+        "Сама земля содрогнется, когда рухнут твои иллюзии победы!"
+      ],
+      "фенрир": [
+        "Ау-у-у! Железные цепи трещат, моя великая ярость безгранична!",
+        "Твоя атака лишь раззадорила зверя внутри меня!",
+        "Мои клыки найдут твое сердце раньше, чем ты замахнешься вновь!"
+      ]
+    };
+
+    // Find custom match
+    let matchKey = Object.keys(fallbacks).find(k => lowerName.includes(k));
+    const list = matchKey ? fallbacks[matchKey] : [
+      "Рх-х! Твой удар горяч, но моя броня крепка!",
+      "Ха! Это лишь раззадорило меня! Попробуй еще!",
+      "Ай! Эта царапина дорого тебе обойдется, ничтожный!",
+      "Твои атаки слишком слабы, чтобы сокрушить мою волю!",
+      "Ты бьешь изо всех сил... но это лишь забавляет меня!"
+    ];
+
+    const randomIndex = Math.floor(Math.random() * list.length);
+    return list[randomIndex];
+  }
+};
+
+export const generateAllBossBanter = async (
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  bossName: string,
+  bossDescription: string
+): Promise<Record<string, string>> => {
+  try {
+    if (!apiKey) throw new Error("API Key configuration missing");
+    const openai = getOpenAIClient(apiKey, baseUrl);
+
+    const systemPrompt = `You are the Boss named "${bossName}" in a dark fantasy RPG habit tracker.
+    The description of you is: "${bossDescription}".
+    
+    You must pre-generate exactly four damage banter phrases/hurt statements in Russian – one for each of the following hero attributes representing the type of attack you received:
+    - strength (physical training, athletic strike)
+    - intelligence (mind magic, spell, educational insight)
+    - charisma (mental influence, verbal wit, presence)
+    - willpower (unbending spirit, meditation, self-discipline check)
+
+    CRITICAL RULES:
+    1. Each phrase MUST be short (maximum 1-2 short sentences, 5 to 15 words).
+    2. Write exclusively in Russian, from the first-person perspective of the boss "${bossName}".
+    3. Give the phrases a unique atmospheric flavor matching the boss's name and description (e.g. frozen/wolf motifs for Fenrir, void/corruption/abyss, etc.).
+    4. Do not include game mechanics or numbers in the dialogue. Keep the style dark fantasy, epic, monstrous, or proud.
+    5. Return ONLY a valid JSON object matching this structure:
+    {
+      "strength": "...",
+      "intelligence": "...",
+      "charisma": "...",
+      "willpower": "..."
+    }`;
+
+    const response = await openai.chat.completions.create({
+      model: model || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Pre-generate 4 banter lines for boss "${bossName}" matching the specified JSON format.` }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.8
+    });
+
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response from AI");
+
+    const data = extractJSON(content);
+    if (data && typeof data === 'object') {
+      const result: Record<string, string> = {};
+      const stats = ['strength', 'intelligence', 'charisma', 'willpower'];
+      stats.forEach(key => {
+        if (data[key]) {
+          result[key] = data[key].replace(/^["'«“]|["'»”]$/g, '').trim();
+        }
+      });
+      if (Object.keys(result).length === 4) {
+        return result;
+      }
+    }
+    throw new Error("Invalid format received");
+  } catch (error) {
+    console.warn("[AI Boss Banter] Fallback banter pre-generation used:", error);
+    
+    // Custom beautiful fallback generator based on names
+    const lowerName = bossName.toLowerCase();
+    const fallbacks: Record<string, Record<string, string>> = {
+      "левиафан": {
+        strength: "Глупец! Твоя сталь лишь царапает мою вековую океанскую чешую!",
+        intelligence: "Твои плетения разума рассеиваются в бесконечном течении пучины!",
+        charisma: "Твои сладкие речи заглушаются ревом прилива. Море безмолвно!",
+        willpower: "Твое превозмогание — лишь мелкая волна перед моим вечным давлением!"
+      },
+      "аматерасу": {
+        strength: "Физическая сила тщетна перед сиянием великого вечного солнца!",
+        intelligence: "Твой мизерный интеллект гаснет при свете божественного огня!",
+        charisma: "Перед моим величием меркнет любая смертная харизма!",
+        willpower: "Твоя хрупкая воля сгорит дотла в моем небесном пламени!"
+      },
+      "ёрмунганд": {
+        strength: "Твой разрушительный удар бессилен против колец Мирового Змея!",
+        intelligence: "Твои хитрые формулы не разорвут бесконечную цепь судьбы!",
+        charisma: "Ш-ш-ссс... Твое очарование не остановит неотвратимый яд забвения!",
+        willpower: "Твой дух крепок, но колесо времени все равно обратит тебя в прах!"
+      },
+      "фенрир": {
+        strength: "Твоя сталь лишь злит зверя! Мои железные цепи рвутся!",
+        intelligence: "Твои коварные планы рассыплются от одного удара моих когтей!",
+        charisma: "Твой пустой лепет прекратится, когда мои клыки сомкнутся на твоем горле!",
+        willpower: "Твоя воля горит ярко, но первобытная тьма все равно поглотит этот свет!"
+      }
+    };
+
+    let matchKey = Object.keys(fallbacks).find(k => lowerName.includes(k));
+    if (matchKey) {
+      return fallbacks[matchKey];
+    } else {
+      return {
+        strength: `Ха-ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!`,
+        intelligence: `Твои заумные мысли и фокусы разума рассыпаются при столкновении со мной!`,
+        charisma: `Ты мнишь себя красноречивым лидером? Твои слова бессильны против моего величия!`,
+        willpower: `Ты закаляешь свой дух, но моя воля монолитна и не дрогнет от твоих потуг!`
+      };
+    }
+  }
+};
+
+
+

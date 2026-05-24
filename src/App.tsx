@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sword, CheckCircle, Circle, Plus, Trash2, Trophy, Skull, User, Flame, Target, Shield, Book, Heart, Zap, Clock, AlertCircle, Settings, Bot, X, Loader2, RefreshCw, AlertTriangle, Download, HelpCircle, ChevronUp, ChevronDown, ChevronRight, Eye, ShoppingBag, Coins, Map, Store, Tent, Dna, Compass, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics, regenerateAITown, generateChronicleVictory, generateMasterBalanceTasks } from './lib/ai';
+import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics, regenerateAITown, generateChronicleVictory, generateMasterBalanceTasks, generateAllBossBanter } from './lib/ai';
 import { NPCModal } from './components/NPCModal';
 
 export type StatType = 'strength' | 'intelligence' | 'charisma' | 'willpower' | 'unknown';
@@ -386,6 +386,93 @@ const getFamiliarBuff = (combo: number, familiar?: Familiar) => {
   return baseBuff + (familiar.level * 0.001);
 };
 
+const getFamiliarSkillDamage = (familiar: Familiar, combo: number) => {
+  if (familiar.stage === 'egg') return 0;
+  const stageMultipliers: Record<string, number> = {
+    baby: 1.0,
+    evolved: 1.3,
+    ultra: 1.6
+  };
+  const stageMult = stageMultipliers[familiar.stage] || 1.0;
+  return Math.round((20 + (familiar.level * 2) + (combo * 1)) * stageMult);
+};
+
+const FAMILIAR_SKILLS: Record<string, { name: string; description: string; effectText: string; damageType: StatType }> = {
+  'Дракон': { name: 'Пламя Гнева', description: 'Извергает столб разрушительного драконьего пламени.', effectText: 'наносит сокрушительный удар по слабости босса!', damageType: 'strength' },
+  'Волк': { name: 'Вой Стаи', description: 'Призывает духи волков для сокрушительного натиска воли.', effectText: 'подавляет волю босса свирепым воем!', damageType: 'willpower' },
+  'Грифон': { name: 'Ураган Справедливости', description: 'Вызывает режущие воздушные потоки своей харизмой.', effectText: 'создает вихри элегантного ветра!', damageType: 'charisma' },
+  'Феникс': { name: 'Вспышка Сверхновой', description: 'Освещает разум невероятными вспышками магии солнца.', effectText: 'выжигает защитные барьеры босса чистым знанием!', damageType: 'intelligence' },
+  'Слайм': { name: 'Едкий Сплеск', description: 'Обливает босса липкой едкой слизью, разъедающей все.', effectText: 'обволакивает врага кислотным зарядом!', damageType: 'strength' },
+  'Фея': { name: 'Чародейская Пыльца', description: 'Ослепляет босса волшебными блестками гармонии.', effectText: 'очаровывает разум монстра волшебными искрами!', damageType: 'charisma' },
+  'Энт': { name: 'Опутывание Корнями', description: 'Пробуждает древние лозы земли для удержания босса.', effectText: 'крепко сжимает титанические лозы воли!', damageType: 'willpower' },
+  'Василиск': { name: 'Взгляд Горгоны', description: 'Пронзает босса смертоносной фокусировкой.', effectText: 'поражает ядовитым взглядом глубокой концентрации!', damageType: 'intelligence' }
+};
+
+const getPetInteractionVoice = (type: string, action: 'pet' | 'feed' | 'train' | 'greetings') => {
+  const normType = type.toLowerCase();
+  
+  if (normType.includes('дракон')) {
+    if (action === 'pet') return 'Фырк! *Дракон с умилением пускает маленькие кольца теплого дыма и трется чешуйчатой мордочкой о вашу ладонь*';
+    if (action === 'feed') return 'Ррр-мяу! *Хрумкает с аппетитом, его глаза вспыхивают ярким желтым светом от прилива сил*';
+    if (action === 'train') return 'Гррра! *Расправляет кожистые крылышки и выпускает аккуратный огненный сгусток в воздух*';
+    return 'Ш-ш... Я прикрою твою спину в бою!';
+  }
+  
+  if (normType.includes('волк')) {
+    if (action === 'pet') return 'Аууф! *Пес довольно виляет пушистым хвостом, кладет лапы вам на колени и облизывает лицо*';
+    if (action === 'feed') return '*Скулит от нетерпения и моментально заглатывает кусок, благодарно повиливая хвостом*';
+    if (action === 'train') return '*Напрягает мускулы, прижимает уши и совершает стремительный тренировочный бросок*';
+    return 'Мы — одна стая. Твои цели — мои цели!';
+  }
+  
+  if (normType.includes('феникс')) {
+    if (action === 'pet') return '*Феникс тихо напевает целебную мелодию, распушая теплые золотистые перья*';
+    if (action === 'feed') return '*Аккуратно клюет семена, заставляя их испускать мягкое целебное сияние*';
+    if (action === 'train') return 'Пввии! *Вспыхивает ослепительным, но не обжигающим пламенем, взмывая вверх*';
+    return 'Из пепла к звездам! Я помогу тебе преодолеть любые трудности!';
+  }
+  
+  if (normType.includes('грифон')) {
+    if (action === 'pet') return '*Грифон гордо выпрямляет спину, но затем прищуривает большие глаза и утыкается клювом вам в плечо*';
+    if (action === 'feed') return '*С достоинством и аристократическим аппетитом съедает пищу, издавая клекот удовлетворения*';
+    if (action === 'train') return 'Кья-а! *Взмахивает могучими крыльями, поднимая легкий вихрь в комнате*';
+    return 'Небеса благословляют наше содружество!';
+  }
+  
+  if (normType.includes('слайм')) {
+    if (action === 'pet') return '*Бульк-бульк! Слайм довольно вибрирует, меняет форму на форму сердечка и ластится*';
+    if (action === 'feed') return '*Плюх! Пища погружается внутрь слайма и медленно растворяется, окрашивая его в яркие радужные цвета*';
+    if (action === 'train') return '*Буль-мяу! С силой отскакивает от пола и совершает тройное сальто назад*';
+    return 'Бульк... Я липкий, но верный друг!';
+  }
+  
+  if (normType.includes('фея')) {
+    if (action === 'pet') return '*Фея звонко смеется, кружится вокруг вашей руки и оставляет за собой сияющий след из пыльцы*';
+    if (action === 'feed') return '*С восторгом берет лакомство маленькими ручками и откусывает крошечные кусочки, сверкая глазками*';
+    if (action === 'train') return '*Чертит в воздухе волшебную сияющую руну, концентрируя природную магию*';
+    return 'Да пребудет с тобой волшебство гармонии!';
+  }
+
+  if (normType.includes('энт')) {
+    if (action === 'pet') return '*Шелестит мягкими дубовыми листьями и медленно протягивает ветвь, чтобы погладить вас в ответ*';
+    if (action === 'feed') return '*Впитывает питательные вещества корнями и заметно расправляет кору, зеленея на глазах*';
+    if (action === 'train') return '*Со звуком треска дерева укореняется поглубже и поднимает мощные земляные лозы*';
+    return 'Сила природы медленная, но несокрушимая.';
+  }
+
+  if (normType.includes('василиск')) {
+    if (action === 'pet') return '*Василиск аккуратно обвивает вашу руку холодным кольчатым хвостом и глухо шипит от удовольствия*';
+    if (action === 'feed') return '*Стремительно заглатывает пищу целиком и облизывается раздвоенным язычком*';
+    if (action === 'train') return '*Направляет свой парализующий взгляд в тренировочную мишень, прожигая в ней фокус*';
+    return 'Мой взор верен, мой яд безжалостен к твоим ленивым мыслям.';
+  }
+
+  if (action === 'pet') return `*${type} ласково прижимается к вам, выражая огромную преданность питомца*`;
+  if (action === 'feed') return `*${type} с радостью поглощает угощение, чувствуя прилив бодрости и сытости*`;
+  if (action === 'train') return `*${type} усердно повторяет боевые стойки, готовясь сокрушать врагов*`;
+  return `Я всегда рядом, чтобы помочь тебе на пути героя!`;
+};
+
 const defaultStats = {
   strength: { level: 1, xp: 0 },
   intelligence: { level: 1, xp: 0 },
@@ -534,6 +621,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   const [bossDefeatError, setBossDefeatError] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [bossFailed, setBossFailed] = useState(false);
+  const [petReactionMessage, setPetReactionMessage] = useState<string>('');
+  const [familiarSkillUsed, setFamiliarSkillUsed] = useState(false);
   const [midnightEchoReport, setMidnightEchoReport] = useState<{ missedTasks: number; damageTaken: number; comboReset: boolean } | null>(null);
   
   // City Node States
@@ -646,6 +735,24 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     } catch { return null; }
   });
 
+  const [lastMasterQuestStat, setLastMasterQuestStat] = useState<StatType | null>(() => {
+    try {
+      return localStorage.getItem('questlog_last_master_quest_stat') as StatType | null;
+    } catch { return null; }
+  });
+
+  const [masterQuestBossId, setMasterQuestBossId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('questlog_master_quest_boss_id');
+    } catch { return null; }
+  });
+
+  const [masterQuestCampaignId, setMasterQuestCampaignId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('questlog_master_quest_campaign_id');
+    } catch { return null; }
+  });
+
   const [chronicleVictory, setChronicleVictory] = useState<ChronicleVictory | null>(() => {
     try {
       const saved = localStorage.getItem('questlog_chronicle_victory');
@@ -658,6 +765,30 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   useEffect(() => {
     safeStorageSet('questlog_master_quest', masterQuest ? JSON.stringify(masterQuest) : '');
   }, [masterQuest]);
+
+  useEffect(() => {
+    if (lastMasterQuestStat) {
+      safeStorageSet('questlog_last_master_quest_stat', lastMasterQuestStat);
+    } else {
+      localStorage.removeItem('questlog_last_master_quest_stat');
+    }
+  }, [lastMasterQuestStat]);
+
+  useEffect(() => {
+    if (masterQuestBossId) {
+      safeStorageSet('questlog_master_quest_boss_id', masterQuestBossId);
+    } else {
+      localStorage.removeItem('questlog_master_quest_boss_id');
+    }
+  }, [masterQuestBossId]);
+
+  useEffect(() => {
+    if (masterQuestCampaignId) {
+      safeStorageSet('questlog_master_quest_campaign_id', masterQuestCampaignId);
+    } else {
+      localStorage.removeItem('questlog_master_quest_campaign_id');
+    }
+  }, [masterQuestCampaignId]);
 
   useEffect(() => {
     safeStorageSet('questlog_chronicle_victory', chronicleVictory ? JSON.stringify(chronicleVictory) : '');
@@ -687,6 +818,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   useEffect(() => {
     if (activeTab !== 'boss') return;
     if (masterQuest) return;
+    if (boss && boss.id && boss.id === masterQuestBossId) return;
+    if (campaign && campaign.id && masterQuestCampaignId === campaign.id) return;
 
     const statsToCheck: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
     const levels = statsToCheck.map(s => player.stats[s]?.level || 1);
@@ -700,7 +833,13 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           minIndices.push(idx);
         }
       });
-      const neglectedIndex = minIndices[Math.floor(Math.random() * minIndices.length)];
+      
+      let eligibleIndices = minIndices.filter(idx => statsToCheck[idx] !== lastMasterQuestStat);
+      if (eligibleIndices.length === 0) {
+        eligibleIndices = minIndices;
+      }
+      
+      const neglectedIndex = eligibleIndices[Math.floor(Math.random() * eligibleIndices.length)];
       const stat = statsToCheck[neglectedIndex];
 
       const newQuest: MasterQuest = {
@@ -709,9 +848,16 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         current: 0
       };
       setMasterQuest(newQuest);
+      setLastMasterQuestStat(stat);
+      if (boss && boss.id) {
+        setMasterQuestBossId(boss.id);
+      }
+      if (campaign && campaign.id) {
+        setMasterQuestCampaignId(campaign.id);
+      }
       setGmMessage(`Мастер: "Твоя тренировка несбалансирована! Ты сильно пренебрегаешь характеристикой ${STATS[stat]?.name || stat}. Я заблокировал логово босса. Выполни мои указания и восстанови баланс!"`);
     }
-  }, [activeTab, player.stats, masterQuest]);
+  }, [activeTab, player.stats, masterQuest, boss, masterQuestBossId, lastMasterQuestStat, campaign, masterQuestCampaignId]);
 
   const processingEncounterRef = useRef(false);
   const preGeneratingChronicleRef = useRef(false);
@@ -1162,6 +1308,48 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   }, [boss]);
 
   useEffect(() => {
+    if (!boss || !boss.id) return;
+    
+    const statsArr: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
+    const hasAllBanter = boss.banter && statsArr.every(s => typeof boss.banter?.[s] === 'string' && boss.banter[s].trim() !== '');
+    
+    if (hasAllBanter) return;
+    
+    let isMounted = true;
+    (async () => {
+      try {
+        const generatedBanter = await generateAllBossBanter(
+          effectiveApiKey,
+          effectiveAiBaseUrl,
+          effectiveAiModel,
+          boss.name,
+          boss.description
+        );
+        if (isMounted) {
+          setBoss(prev => {
+            if (prev && prev.id === boss.id) {
+              return {
+                ...prev,
+                banter: {
+                  ...prev.banter,
+                  ...generatedBanter
+                }
+              };
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error("Failed to pre-generate boss banter", err);
+      }
+    })();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [boss?.id, effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel]);
+
+  useEffect(() => {
     if (campaign) {
       safeStorageSet('questlog_campaign', JSON.stringify(campaign));
     } else {
@@ -1372,6 +1560,37 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       const newDailyGrossPoints = (prev.dailyGrossPoints || 0) + damageAmount;
       const newDailyTasksCompleted = isDaily ? (prev.dailyTasksCompleted || 0) + 1 : (prev.dailyTasksCompleted || 0);
 
+      let updatedFamiliar = prev.familiar ? { ...prev.familiar } : undefined;
+      if (updatedFamiliar) {
+        setFamiliarSkillUsed(false); // Recharge companion skill on task completion
+        updatedFamiliar.xp += 10;
+        
+        if (updatedFamiliar.stage === 'egg') {
+          if (updatedFamiliar.xp >= 100) {
+            updatedFamiliar.stage = 'baby';
+            updatedFamiliar.xp = 0;
+            updatedFamiliar.level = 1;
+            updatedFamiliar.name = 'Новорожденный Пушистик';
+            updatedFamiliar.type = 'Фея';
+          }
+        } else {
+          let nextLevelReq = updatedFamiliar.level * 100;
+          if (updatedFamiliar.xp >= nextLevelReq) {
+            updatedFamiliar.xp -= nextLevelReq;
+            updatedFamiliar.level += 1;
+            if (updatedFamiliar.stage === 'baby' && updatedFamiliar.level >= 10) {
+              updatedFamiliar.stage = 'evolved';
+            } else if (updatedFamiliar.stage === 'evolved' && updatedFamiliar.level >= 25) {
+              updatedFamiliar.stage = 'ultra';
+            }
+          }
+        }
+
+        if (updatedFamiliar.status === 'expedition' && updatedFamiliar.expeditionEndsAt) {
+          updatedFamiliar.expeditionEndsAt = Math.max(Date.now(), updatedFamiliar.expeditionEndsAt - 45 * 60 * 1000);
+        }
+      }
+
       return {
         ...prev,
         level: newLevel,
@@ -1382,6 +1601,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         pendingDamage: newPendingDamage,
         dailyGrossPoints: newDailyGrossPoints,
         dailyTasksCompleted: newDailyTasksCompleted,
+        familiar: updatedFamiliar,
         stats: {
           ...prev.stats,
           [stat]: statData
@@ -1705,7 +1925,253 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     }
   };
 
+  const handlePetAction = (action: 'pet' | 'feed' | 'train') => {
+    if (!player.familiar) return;
+    
+    // Egg hatching bypasses normal active status checks
+    if (player.familiar.stage === 'egg') {
+      const now = Date.now();
+      if (action === 'pet') {
+        if (player.familiar.lastWarmedAt && (now - player.familiar.lastWarmedAt) < 24 * 60 * 60 * 1000) {
+          import('./lib/sfx').then(({ playSound }) => playSound('error'));
+          setGmMessage('Яйцо уже согрето вашей заботой сегодня. Дайте ему согреться!');
+          return;
+        }
+        
+        setPlayer(prev => {
+          if (!prev.familiar) return prev;
+          const updated = { ...prev.familiar };
+          updated.xp = Math.min(100, updated.xp + 25);
+          updated.lastWarmedAt = now;
+          let newStage = updated.stage;
+          if (updated.xp >= 100) {
+            newStage = 'baby';
+            updated.xp = 0;
+            updated.level = 1;
+            updated.name = 'Новорожденный Пушистик';
+            updated.type = 'Фея';
+          }
+          return {
+            ...prev,
+            familiar: {
+              ...updated,
+              stage: newStage
+            }
+          };
+        });
+        import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+        setGmMessage('Вы согрели яйцо дыханием и заботой. Будущий спутник крепнет (+25% warmth)!');
+      } else if (action === 'feed') {
+        if (player.gold < 30) {
+          import('./lib/sfx').then(({ playSound }) => playSound('error'));
+          setGmMessage('Недостаточно золота для обогрева очагом (нужно 30 золота)!');
+          return;
+        }
+        setPlayer(prev => {
+          if (!prev.familiar) return prev;
+          const updated = { ...prev.familiar };
+          updated.xp = Math.min(100, updated.xp + 35);
+          let newStage = updated.stage;
+          if (updated.xp >= 100) {
+            newStage = 'baby';
+            updated.xp = 0;
+            updated.level = 1;
+            updated.name = 'Новорожденный Пушистик';
+            updated.type = 'Фея';
+          }
+          return {
+            ...prev,
+            gold: prev.gold - 30,
+            familiar: {
+              ...updated,
+              stage: newStage
+            }
+          };
+        });
+        import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+        setGmMessage('Вы поместили яйцо в тепло домашнего очага (-30 золота). Прогресс вылупления увеличен на 35%!');
+      }
+      return;
+    }
 
+    if (player.familiar.status === 'injured') {
+      import('./lib/sfx').then(({ playSound }) => playSound('error'));
+      setGmMessage('Твой питомец слишком слаб и изможден. Сначала исцели его кормом Торговки!');
+      return;
+    }
+    
+    const now = Date.now();
+    const petType = player.familiar.type || 'Волк';
+    
+    if (action === 'pet') {
+      if (player.familiar.lastPettedAt && (now - player.familiar.lastPettedAt) < 24 * 60 * 60 * 1000) {
+        import('./lib/sfx').then(({ playSound }) => playSound('error'));
+        setGmMessage('Ваш спутник уже затискан до упаду сегодня! Погладьте его завтра.');
+        return;
+      }
+      
+      const voice = getPetInteractionVoice(petType, 'pet');
+      setPetReactionMessage(voice);
+      import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+      
+      setPlayer(prev => {
+        if (!prev.familiar) return prev;
+        const updated = { ...prev.familiar };
+        updated.xp += 15;
+        updated.lastPettedAt = now;
+        
+        let newStage = updated.stage;
+        let newLevel = updated.level;
+        const nextLevelReq = newLevel * 100;
+        if (updated.xp >= nextLevelReq) {
+          updated.xp -= nextLevelReq;
+          newLevel += 1;
+          if (newLevel >= 10 && newStage === 'baby') newStage = 'evolved';
+          else if (newLevel >= 25 && newStage === 'evolved') newStage = 'ultra';
+        }
+        
+        return {
+          ...prev,
+          familiar: {
+            ...updated,
+            level: newLevel,
+            stage: newStage
+          }
+        };
+      });
+      setGmMessage(`Вы нежно погладили питомца: ${player.familiar.name} получает +15 опыта!`);
+    } else if (action === 'feed') {
+      const foodItemIndex = player.inventory.findIndex(item => item.effect.type === 'pet_food');
+      const hasFoodItem = foodItemIndex !== -1;
+      
+      if (!hasFoodItem && player.gold < 30) {
+        import('./lib/sfx').then(({ playSound }) => playSound('error'));
+        setGmMessage('У вас нет корма в инвентаре и не хватает золота (нужно 30 золота) для угощения!');
+        return;
+      }
+      
+      const voice = getPetInteractionVoice(petType, 'feed');
+      setPetReactionMessage(voice);
+      import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+      
+      setPlayer(prev => {
+        if (!prev.familiar) return prev;
+        const updated = { ...prev.familiar };
+        updated.xp += 40;
+        
+        let updatedInventory = [...prev.inventory];
+        let updatedGold = prev.gold;
+        if (hasFoodItem) {
+          updatedInventory.splice(foodItemIndex, 1);
+        } else {
+          updatedGold -= 30;
+        }
+        
+        let newStage = updated.stage;
+        let newLevel = updated.level;
+        const nextLevelReq = newLevel * 100;
+        if (updated.xp >= nextLevelReq) {
+          updated.xp -= nextLevelReq;
+          newLevel += 1;
+          if (newLevel >= 10 && newStage === 'baby') newStage = 'evolved';
+          else if (newLevel >= 25 && newStage === 'evolved') newStage = 'ultra';
+        }
+        
+        return {
+          ...prev,
+          gold: updatedGold,
+          inventory: updatedInventory,
+          familiar: {
+            ...updated,
+            level: newLevel,
+            stage: newStage
+          }
+        };
+      });
+      setGmMessage(`Вы накормили спутника лакомством: ${player.familiar.name} сыт и получает +40 опыта питомца!`);
+    } else if (action === 'train') {
+      if (player.gold < 40) {
+        import('./lib/sfx').then(({ playSound }) => playSound('error'));
+        setGmMessage('Недостаточно золота! Нужно 40 золота для тренировок зверя.');
+        return;
+      }
+      
+      const voice = getPetInteractionVoice(petType, 'train');
+      setPetReactionMessage(voice);
+      import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+      
+      setPlayer(prev => {
+        if (!prev.familiar) return prev;
+        const updated = { ...prev.familiar };
+        updated.xp += 60;
+        
+        let newStage = updated.stage;
+        let newLevel = updated.level;
+        const nextLevelReq = newLevel * 100;
+        if (updated.xp >= nextLevelReq) {
+          updated.xp -= nextLevelReq;
+          newLevel += 1;
+          if (newLevel >= 10 && newStage === 'baby') newStage = 'evolved';
+          else if (newLevel >= 25 && newStage === 'evolved') newStage = 'ultra';
+        }
+        
+        return {
+          ...prev,
+          gold: prev.gold - 40,
+          familiar: {
+            ...updated,
+            level: newLevel,
+            stage: newStage
+          }
+        };
+      });
+      setGmMessage(`Упорная тренировка завершена! ${player.familiar.name} взбодрился и получает +60 опыта!`);
+    }
+  };
+
+  const handleFamiliarSkill = () => {
+    if (!player.familiar || player.familiar.stage === 'egg' || player.familiar.status !== 'active' || familiarSkillUsed || boss.hp <= 0) return;
+    
+    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+    
+    const petType = player.familiar.type || 'Волк';
+    const skill = FAMILIAR_SKILLS[petType] || {
+      name: 'Удар Компаньона',
+      description: 'Священная атака вашего верного спутника.',
+      effectText: 'наносит стремительный сбалансированный удар!',
+      damageType: 'willpower'
+    };
+    
+    const baseDmg = getFamiliarSkillDamage(player.familiar, player.combo);
+    // Find weakness stat to apply multipliers
+    let weaknessStat: StatType = skill.damageType;
+    let maxMultiplier = 0;
+    if (boss.multipliers) {
+      (Object.keys(boss.multipliers) as StatType[]).forEach(stat => {
+        if (boss.multipliers[stat] > maxMultiplier) {
+          maxMultiplier = boss.multipliers[stat];
+          weaknessStat = stat;
+        }
+      });
+    }
+
+    const multiplier = boss.multipliers?.[weaknessStat] ?? 1.5;
+    const damageDealt = Math.round(baseDmg * multiplier);
+    
+    setFamiliarSkillUsed(true);
+    setLastDamageDealt(damageDealt);
+    setLastDamageColor(STATS[weaknessStat]?.hex || '#00FF66');
+    setBossHit(true);
+    setTimeout(() => setBossHit(false), 400);
+    
+    setBoss(prev => {
+      if (!prev) return null;
+      const newHp = Math.max(0, prev.hp - damageDealt);
+      return { ...prev, hp: newHp };
+    });
+    
+    setGmMessage(`${player.familiar.name}: "*Гррр!* ${player.familiar.name} применяет боевой навык «${skill.name}» и ${skill.effectText} Нанесено ${damageDealt} ед. урона!"`);
+  };
 
   const handleAttack = () => {
     const totalPending = (Object.values(player.pendingDamage) as number[]).reduce((a, b) => a + b, 0);
@@ -1791,10 +2257,6 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       })();
     }
 
-    if (boss.banter && boss.banter[maxStat]) {
-      setGmMessage(`Босс: "${boss.banter[maxStat]}"`);
-    }
-
     setLastDamageDealt(damageDealt);
     setLastDamageColor(STATS[maxStat].hex);
     setBossHit(true);
@@ -1810,9 +2272,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     });
 
     setPlayer(prev => {
-      if (bossSurvived) {
-        setGmMessage(`Босс пережил атаку! Соберите больше силы для следующего удара.`);
-      } else if (damageDealt > boss.hp) {
+      if (damageDealt > boss.hp) {
         // Overkill logic: refund unused pending damage
         const usedFraction = boss.hp / damageDealt;
         const remainingFraction = 1 - usedFraction;
@@ -1827,6 +2287,48 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         pendingDamage: newPendingDamage
       };
     });
+
+    if (bossSurvived) {
+      if (boss.banter && boss.banter[maxStat]) {
+        setGmMessage(`Босс: "${boss.banter[maxStat]}"`);
+      } else {
+        const lowerName = boss.name.toLowerCase();
+        const fallbacks: Record<string, string[]> = {
+          "левиафан": [
+            "Р-р-рааа! Древние пучины поглотят твою дерзость!",
+            "Волны бьются о сталь... Твой удар — лишь капля в моем бесконечном море!",
+            "Вода вокруг закипает от твоей ярости, ничтожный смертный!"
+          ],
+          "аматерасу": [
+            "Глупец, ты пытаешься затмить свет самого небесного светила?!",
+            "Тьма сгущается вокруг тех, кто дерзает поднять руку на божество!",
+            "Мое великое сияние выжжет твою самоуверенность дотла!"
+          ],
+          "ёрмунганд": [
+            "Х-х-ссс! Великое кольцо времени сжимается, тебе не уйти!",
+            "Моя чешуя видела закаты целых миров, твои потуги жалки!",
+            "Сама земля содрогнется, когда рухнут твои иллюзии победы!"
+          ],
+          "фенрир": [
+            "Ау-у-у! Железные цепи трещат, моя великая ярость безгранична!",
+            "Твоя атака лишь раззадорила зверя внутри меня!",
+            "Мои клыки найдут твое сердце раньше, чем ты замахнешься вновь!"
+          ]
+        };
+        let matchKey = Object.keys(fallbacks).find(k => lowerName.includes(k));
+        const list = matchKey ? fallbacks[matchKey] : [
+          "Рх-х! Твой удар горяч, но моя броня крепка!",
+          "Ха! Это лишь раззадорило меня! Попробуй еще!",
+          "Ай! Эта царапина дорого тебе обойдется, ничтожный!",
+          "Твои атаки слишком слабы, чтобы сокрушить мою волю!",
+          "Ты бьешь изо всех сил... но это лишь забавляет меня!"
+        ];
+        const randomIndex = Math.floor(Math.random() * list.length);
+        setGmMessage(`Босс: "${list[randomIndex]}"`);
+      }
+    } else {
+      setGmMessage(`Мастер: "Превосходно! Владыка ${boss.name} повержен твоей непоколебимой силой!"`);
+    }
   };
 
   const handleBossFailed = () => {
@@ -2980,25 +3482,67 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
         {/* GM Message Toast */}
         <AnimatePresence>
-          {gmMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.9 }}
-              className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-[calc(28rem-3rem)] z-40 glass-card p-4 shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex gap-4 items-start"
-            >
-              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center shrink-0 border border-amber-500/50">
-                <Bot size={20} className="text-amber-400" />
-              </div>
-              <div className="flex-1">
-                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1">Гейм Мастер</h4>
-                <p className="text-sm text-slate-200 leading-relaxed">{gmMessage}</p>
-              </div>
-              <button onClick={() => setGmMessage(null)} className="text-slate-500 hover:text-slate-300 shrink-0">
-                <X size={16} />
-              </button>
-            </motion.div>
-          )}
+          {gmMessage && (() => {
+            let speaker = "Гейм Мастер";
+            let messageText = gmMessage;
+            let themeColor = "amber";
+            
+            // Check if there is a colon and quotes or simple speech pattern
+            const match = gmMessage.match(/^([^:]+):\s*(.*)$/s);
+            if (match) {
+              const possibleSpeaker = match[1].trim();
+              const textOnly = match[2].trim().replace(/^["']|["']$/g, ''); // remove bounding quotes if any
+              
+              if (possibleSpeaker.toLowerCase() === "мастер") {
+                speaker = "Мастер Игры";
+                messageText = `"${textOnly}"`;
+              } else if (possibleSpeaker.toLowerCase() === "босс") {
+                speaker = boss?.name || "Владыка Хаоса";
+                messageText = `"${textOnly}"`;
+                themeColor = "rose";
+              } else {
+                speaker = possibleSpeaker;
+                messageText = `"${textOnly}"`;
+                if (boss && possibleSpeaker.toLowerCase().includes(boss.name.toLowerCase())) {
+                  themeColor = "rose";
+                } else {
+                  themeColor = "amber";
+                }
+              }
+            } else {
+              if (activeTab === 'boss' && boss && boss.hp > 0) {
+                themeColor = "rose";
+              }
+            }
+            
+            return (
+              <motion.div
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-[calc(28rem-3rem)] z-40 glass-card p-4 shadow-[0_10px_40px_rgba(0,0,0,0.5)] flex gap-4 items-start border border-white/10"
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 border ${
+                  themeColor === 'rose' 
+                    ? 'bg-rose-500/20 border-rose-500/50 text-rose-400' 
+                    : 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                }`}>
+                  {themeColor === 'rose' ? <Skull size={20} /> : <Bot size={20} />}
+                </div>
+                <div className="flex-1">
+                  <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${
+                    themeColor === 'rose' ? 'text-rose-400' : 'text-amber-400'
+                  }`}>
+                    {speaker}
+                  </h4>
+                  <p className="text-sm text-slate-200 leading-relaxed font-sans">{messageText}</p>
+                </div>
+                <button onClick={() => setGmMessage(null)} className="text-slate-500 hover:text-[#e2e8f0] shrink-0 cursor-pointer">
+                  <X size={16} />
+                </button>
+              </motion.div>
+            );
+          })()}
         </AnimatePresence>
 
         {/* Content */}
@@ -3880,12 +4424,12 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         const boxShadow = totalPending > 0 ? `0 0 ${20 + glowIntensity * 30}px rgba(225,29,72,${0.2 + glowIntensity * 0.5})` : 'none';
 
                         return (
-                          <div className="pt-1">
+                          <div className="pt-1 space-y-2">
                             <button
                               onClick={handleAttack}
                               disabled={totalPending === 0}
                               style={{ ...gradientStyle, boxShadow }}
-                              className={`w-full py-2.5 ${totalPending === 0 ? 'bg-[#12141A] text-[#8A8D93] border border-white/5 shadow-inner' : 'text-white border-2 border-white/20 animate-gradient-flow'} font-extrabold rounded-[14px] transition-all active:scale-95 flex items-center justify-center gap-2 relative overflow-hidden text-sm uppercase tracking-wider`}
+                              className={`w-full py-2.5 ${totalPending === 0 ? 'bg-[#12141A] text-[#8A8D93] border border-white/5 shadow-inner' : 'text-white border-2 border-white/20 animate-gradient-flow cursor-pointer'} font-extrabold rounded-[14px] transition-all active:scale-95 flex items-center justify-center gap-2 relative overflow-hidden text-sm uppercase tracking-wider`}
                             >
                               {totalPending > 0 && (
                                 <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
@@ -3893,6 +4437,31 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                               <Sword size={16} className="relative z-10" />
                               <span className="relative z-10">Нанести удар</span>
                             </button>
+
+                            {player.familiar && player.familiar.stage !== 'egg' && player.familiar.status === 'active' && (
+                              <div className="mt-2 text-left">
+                                {familiarSkillUsed ? (
+                                  <div className="w-full py-2.5 bg-slate-950/40 border border-white/5 text-slate-500 font-bold rounded-[14px] text-[10px] uppercase tracking-wider text-center select-none">
+                                    ⚔ Боевой навык перезаряжается...
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={handleFamiliarSkill}
+                                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-[14px] border border-blue-400/30 shadow-[0_0_15px_rgba(37,99,235,0.35)] transition-all active:scale-95 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider relative overflow-hidden cursor-pointer"
+                                  >
+                                    <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
+                                    <Zap size={14} className="text-amber-300 animate-pulse shrink-0" />
+                                    <span className="truncate">
+                                      {player.familiar.name}: {FAMILIAR_SKILLS[player.familiar.type]?.name || 'Удар Спутника'} (+{getFamiliarSkillDamage(player.familiar, player.combo)} ур.)
+                                    </span>
+                                  </button>
+                                )}
+                                <p className="text-[8px] text-slate-400 text-center mt-1.5 leading-snug">
+                                  {FAMILIAR_SKILLS[player.familiar.type]?.description || 'Наносит сокрушительный урон по слабости босса.'} <br/>
+                                  <span className="text-emerald-400 font-semibold">(Выполнение ваших реальных дел перезаряжает навык!)</span>
+                                </p>
+                              </div>
+                            )}
                           </div>
                         );
                       })()
@@ -3953,6 +4522,17 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                           'bg-emerald-500'
                         }`} />
 
+                        {petReactionMessage && (
+                          <motion.div 
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 rounded-xl p-3 text-[11px] leading-relaxed relative z-20 shadow-md backdrop-blur-sm mx-1"
+                          >
+                            <div className="absolute -bottom-1 w-2.5 h-2.5 bg-[#0d1220] border-r border-b border-emerald-500/20 rotate-45 left-1/2 -translate-x-1/2" />
+                            {petReactionMessage}
+                          </motion.div>
+                        )}
+
                         <div className="flex flex-col items-center gap-4 relative z-10">
                           <div className={`w-28 h-28 rounded-full bg-[#0B0E14] border-4 flex items-center justify-center text-5xl overflow-hidden shrink-0 transition-all duration-500 hover:scale-105 ${
                             player.familiar.status === 'injured' ? 'border-red-500/50 grayscale shadow-[0_0_20px_rgba(239,68,68,0.3)]' :
@@ -4010,48 +4590,152 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                           </div>
                         </div>
 
-                        {player.familiar.stage !== 'egg' && (
-                          <div className="mt-2 space-y-3 z-10 w-full px-2">
-                            <div className="flex justify-between items-end border-b border-white/10 pb-2">
-                              <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Связь</div>
-                              <div className="text-right text-[11px] text-emerald-400 font-bold">
-                                Бафф: +{Math.round(getFamiliarBuff(player.combo, player.familiar) * 100)}%
-                              </div>
+                        <div className="space-y-3 z-10 w-full px-2">
+                          <div className="flex justify-between items-end border-b border-white/10 pb-2">
+                            <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Связь</div>
+                            <div className="text-right text-[11px] text-emerald-400 font-bold">
+                              Бафф: +{Math.round(getFamiliarBuff(player.combo, player.familiar) * 100)}% к наградам
                             </div>
+                          </div>
 
-                            {/* Pet XP Bar */}
-                            <div className="space-y-1.5 pt-1">
-                              <div className="flex justify-between text-[10px] text-emerald-300/80 font-bold uppercase tracking-widest">
-                                <span>Опыт питомца</span>
-                                <span>{player.familiar.xp} / {player.familiar.level * 100}</span>
-                              </div>
-                              <div className="h-2 bg-[#0B0E14] rounded-full overflow-hidden shadow-inner border border-white/5 relative">
-                                <motion.div
-                                  className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 relative"
-                                  initial={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
-                                  animate={{ width: `${(player.familiar.xp / (player.familiar.level * 100)) * 100}%` }}
-                                  transition={{ type: 'spring', bounce: 0 }}
-                                />
-                              </div>
+                          {/* Pet XP / Warmth Bar */}
+                          <div className="space-y-1.5 pt-1">
+                            <div className="flex justify-between text-[10px] text-emerald-300/80 font-bold uppercase tracking-widest">
+                              <span>{player.familiar.stage === 'egg' ? 'Прогресс вылупления' : 'Опыт питомца'}</span>
+                              <span>{player.familiar.xp} / 100</span>
                             </div>
-                            
-                            <div className="w-full mt-4 py-3 px-3 text-center bg-black/40 rounded-lg text-[10px] leading-relaxed text-slate-300 border border-white/5">
-                              {player.familiar.stage === 'baby' ? (
-                                <>Ваш юный компаньон постепенно крепнет благодаря добыче из экспедиций. <strong className="text-blue-400">На 10 уровне</strong> он эволюционирует в грозного спутника.</>
-                              ) : player.familiar.stage === 'evolved' ? (
-                                <>Питомец познал дикие пустоши и обрел могущество. <strong className="text-purple-400">На 25 уровне</strong> он достигнет своей совершенной, легендарной формы!</>
-                              ) : (
-                                <>Легендарное создание, внушающее трепет врагам. Ваш компаньон достиг вершины эволюции и теперь является хранителем вашей судьбы!</>
-                              )}
+                            <div className="h-2 bg-[#0B0E14] rounded-full overflow-hidden shadow-inner border border-white/5 relative">
+                              <motion.div
+                                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 relative"
+                                initial={{ width: `${player.familiar.xp}%` }}
+                                animate={{ width: `${player.familiar.xp}%` }}
+                                transition={{ type: 'spring', bounce: 0 }}
+                              />
                             </div>
                           </div>
-                        )}
-                        
-                        {player.familiar.stage === 'egg' && (
-                          <div className="mt-2 w-full text-center text-slate-400 text-xs italic z-10 p-3 bg-black/20 rounded-xl border border-white/5">
-                            Внутри этого таинственного яйца дремлет великая сила. Оно проклюнется, когда вы одолеете Главного Босса текущей локации!
+
+                          {/* New Interactable Companion Sanctuary Block */}
+                          <div className="bg-black/40 border border-white/5 rounded-xl p-3 space-y-2.5">
+                            <h5 className="text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">
+                              🐾 Обитель питомца
+                            </h5>
+
+                            {player.familiar.stage === 'egg' ? (
+                              <div className="space-y-2">
+                                <p className="text-[10px] text-slate-400 leading-relaxed text-center italic">
+                                  Достигните 100% тепла, согревая яйцо, чтобы оно вылупилось! Завершение ваших реальных задач также добавляет +10% тепла.
+                                </p>
+                                <div className="grid grid-cols-2 gap-2 pt-1.5">
+                                  <button
+                                    onClick={() => handlePetAction('pet')}
+                                    disabled={player.familiar.lastWarmedAt && (Date.now() - player.familiar.lastWarmedAt) < 24 * 60 * 60 * 1000}
+                                    className="py-2 px-1 bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent text-[10px] font-bold text-white uppercase rounded-lg text-center cursor-pointer transition-all"
+                                  >
+                                    {player.familiar.lastWarmedAt && (Date.now() - player.familiar.lastWarmedAt) < 24 * 60 * 60 * 1000 ? 'Согрето сегодня' : '💖 Согреть своим дыханием (+25% свободно)'}
+                                  </button>
+                                  <button
+                                    onClick={() => handlePetAction('feed')}
+                                    className="py-2 px-1 bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-500/30 text-[10px] font-bold text-emerald-300 uppercase rounded-lg text-center cursor-pointer transition-all"
+                                  >
+                                    🔥 Согреть у очага (+35% за 30 золота)
+                                  </button>
+                                </div>
+                              </div>
+                            ) : player.familiar.status === 'injured' ? (
+                              <div className="space-y-2 text-center">
+                                <p className="text-[10px] text-red-300 font-mediumLeading-relaxed">
+                                  Питомец получил серьезные повреждения в бою и не может составить вам компанию.
+                                </p>
+                                <button
+                                  onClick={() => {
+                                    // Live heal helper within profile
+                                    const reviveIndex = player.inventory.findIndex(i => i.effect.type === 'pet_revive');
+                                    const hasRevive = reviveIndex !== -1;
+                                    if (!hasRevive && player.gold < 50) {
+                                      import('./lib/sfx').then(({ playSound }) => playSound('error'));
+                                      setGmMessage('У вас нет Оживителя и недостаточно золота (нужно 50 золота) для мгновенного исцеления!');
+                                      return;
+                                    }
+                                    setPlayer(prev => {
+                                      if (!prev.familiar) return prev;
+                                      let updatedInventory = [...prev.inventory];
+                                      let updatedGold = prev.gold;
+                                      if (hasRevive) {
+                                        updatedInventory.splice(reviveIndex, 1);
+                                      } else {
+                                        updatedGold -= 50;
+                                      }
+                                      return {
+                                        ...prev,
+                                        gold: updatedGold,
+                                        inventory: updatedInventory,
+                                        familiar: {
+                                          ...prev.familiar,
+                                          status: 'active',
+                                          injuredUntil: undefined
+                                        }
+                                      };
+                                    });
+                                    import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+                                    setGmMessage(`Вы успешно восстановили здоровье ${player.familiar.name}!`);
+                                  }}
+                                  className="w-full py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-[10px] font-bold uppercase rounded-lg cursor-pointer transition-all border border-red-400/20"
+                                >
+                                  ❤️ Использовать оживитель (или 50 золота)
+                                </button>
+                              </div>
+                            ) : player.familiar.status === 'expedition' ? (
+                              <div className="text-center space-y-1 py-1">
+                                <p className="text-[10px] text-emerald-300 leading-relaxed font-semibold animate-pulse">
+                                  🛰️ Компаньон ищет древние сокровища...
+                                </p>
+                                <p className="text-[9px] text-slate-400">
+                                  Выполнение ваших повседневных дел ускоряет его путь на 45 минут за каждую завершенную задачу!
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <p className="text-[9px] text-slate-400 leading-normal text-center">
+                                  Взаимодействуйте со своим питомцем ежедневно, чтобы повышать его преданность и открывать уникальные реплики!
+                                </p>
+                                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                                  <button
+                                    onClick={() => handlePetAction('pet')}
+                                    disabled={player.familiar.lastPettedAt && (Date.now() - player.familiar.lastPettedAt) < 24 * 60 * 60 * 1000}
+                                    className="py-1.5 px-1 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:hover:bg-transparent border border-white/10 text-[9px] font-bold text-white uppercase rounded-lg text-center cursor-pointer transition-all"
+                                  >
+                                    🐾 Погладить (+15 XP, бесплатно)
+                                  </button>
+                                  <button
+                                    onClick={() => handlePetAction('feed')}
+                                    className="py-1.5 px-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-[9px] font-bold text-emerald-300 uppercase rounded-lg text-center cursor-pointer transition-all"
+                                  >
+                                    🥩 Кормить (+40 XP, корм/30з)
+                                  </button>
+                                  <button
+                                    onClick={() => handlePetAction('train')}
+                                    className="py-1.5 px-1 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/30 text-[9px] font-bold text-blue-300 uppercase rounded-lg text-center cursor-pointer transition-all"
+                                  >
+                                    ⚔️ Учить (+60 XP, 40 золота)
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                          
+                          <div className="w-full mt-2 py-2 px-3 text-center bg-black/40 rounded-lg text-[9px] leading-relaxed text-slate-400 border border-white/5">
+                            {player.familiar.stage === 'baby' ? (
+                              <>Ваш юный компаньон постепенно крепнет благодаря вашим успехам. <strong className="text-blue-400">На 10 уровне</strong> он эволюционирует во взрослого спутника.</>
+                            ) : player.familiar.stage === 'evolved' ? (
+                              <>Питомец познал дикие пустоши и обрел могущество. <strong className="text-purple-400">На 25 уровне</strong> он достигнет своей совершенной, легендарной формы!</>
+                            ) : player.familiar.stage === 'egg' ? (
+                              <>Достижение 100% согрева позволит вашему будущему союзнику вылупиться!</>
+                            ) : (
+                              <>Легендарное создание, внушающее трепет врагам. Ваш компаньон достиг вершины эволюции и теперь является хранителем вашей судьбы!</>
+                            )}
+                          </div>
+                        </div>
+
                       </div>
                     </div>
                   )}
@@ -4394,7 +5078,10 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         </div>
                         <div>
                           <h4 className="text-lg font-normal text-slate-100 font-serif tracking-wider">{player.familiar.name} <span className="text-xs text-blue-500/80 font-sans tracking-normal uppercase">({player.familiar.type})</span></h4>
-                          <p className="text-[12px] text-slate-400/80 mt-1 italic font-serif opacity-80">Шанс успеха миссии: <span className="text-blue-300 font-bold ml-1 not-italic">{Math.round(Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95) * 100)}%</span></p>
+                          <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed font-sans">
+                            Шанс выживания: <strong className="text-blue-300 font-sans">{Math.round(Math.min(0.2 + (player.dailyTasksCompleted || 0) * 0.2, 0.95) * 100)}%</strong>. <br/>
+                            <span className="text-[10px] text-slate-500 font-sans">Закрывайте реальные дела, чтобы прибавить <strong className="text-emerald-400 font-sans">+20%</strong> за каждую решенную задачу сегодня!</span>
+                          </p>
                         </div>
                       </div>
                     </div>
