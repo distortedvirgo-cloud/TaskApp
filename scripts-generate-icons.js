@@ -2,14 +2,7 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 
-let svgText = fs.readFileSync(path.resolve('public/pwa-icon.svg'), 'utf-8');
-
-// Replace gradients with solid colors for sharp compatibility
-svgText = svgText.replace('url(#bg)', '#0f172a');
-svgText = svgText.replace('url(#sword)', '#fbbf24');
-
-// Wrap in Buffer
-const svgBuffer = Buffer.from(svgText);
+const svgBuffer = fs.readFileSync(path.resolve('public/pwa-icon.svg'));
 
 async function generate() {
   await sharp(svgBuffer)
