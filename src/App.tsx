@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sword, CheckCircle, Circle, Plus, Trash2, Trophy, Skull, User, Flame, Target, Shield, Book, Heart, Zap, Clock, AlertCircle, Settings, Bot, X, Loader2, RefreshCw, AlertTriangle, Download, HelpCircle, ChevronUp, ChevronDown, ChevronRight, Eye, ShoppingBag, Coins, Map, Store, Tent, Dna, Compass, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
-import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics, regenerateAITown, generateChronicleVictory } from './lib/ai';
+import { evaluateTaskWithAI, evaluateTasksBatchWithAI, generateAICampaign, generateAIImage, generateAITrophy, getOpenAIClient, generateDailyMemoryLog, updateBehaviorAnalytics, regenerateAITown, generateChronicleVictory, generateMasterBalanceTasks } from './lib/ai';
 import { NPCModal } from './components/NPCModal';
 
 export type StatType = 'strength' | 'intelligence' | 'charisma' | 'willpower' | 'unknown';
@@ -652,6 +652,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       return saved ? JSON.parse(saved) : null;
     } catch { return null; }
   });
+
+  const [isGeneratingBalanceTasks, setIsGeneratingBalanceTasks] = useState(false);
 
   useEffect(() => {
     safeStorageSet('questlog_master_quest', masterQuest ? JSON.stringify(masterQuest) : '');
@@ -1432,6 +1434,40 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       setTimeout(() => setApiError(null), 3000);
     } finally {
       setIsCategorizingTasks(false);
+    }
+  };
+
+  const handleRequestBalanceTasks = async () => {
+    if (!masterQuest) return;
+    setIsGeneratingBalanceTasks(true);
+    try {
+      const generated = await generateMasterBalanceTasks(
+        effectiveApiKey,
+        effectiveAiBaseUrl,
+        effectiveAiModel,
+        masterQuest.stat
+      );
+      
+      const newTasks: Task[] = generated.map(gt => ({
+        id: crypto.randomUUID(),
+        text: gt.text,
+        stat: masterQuest.stat,
+        type: 'one-off',
+        completed: false,
+        rewarded: false,
+        createdAt: Date.now(),
+        difficulty: gt.difficulty || 2,
+        isMasterTask: true
+      }));
+
+      setTasks(prev => [...prev, ...newTasks]);
+      setGmMessage(`Мастер: "Вот твои испытания для развития характеристики ${STATS[masterQuest.stat]?.name || masterQuest.stat}. Выполни их, чтобы восстановить пошатнувшийся баланс!"`);
+    } catch (error: any) {
+      console.error("Failed to generate master balance tasks:", error);
+      setApiError(error.message || "Ошибка при создании задач");
+      setTimeout(() => setApiError(null), 3000);
+    } finally {
+      setIsGeneratingBalanceTasks(false);
     }
   };
 
@@ -3419,8 +3455,29 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                           Завершить Испытание (+150 XP, +50 Золота)
                         </button>
                       ) : (
-                        <div className="w-full py-3.5 bg-white/5 border border-white/10 opacity-60 text-slate-400 font-black text-xs uppercase tracking-[2px] rounded-xl font-sans select-none">
-                          Доступ заблокирован испытанием
+                        <div className="space-y-3">
+                          <button
+                            onClick={handleRequestBalanceTasks}
+                            disabled={isGeneratingBalanceTasks}
+                            style={{ backgroundColor: STATS[masterQuest.stat]?.hex }}
+                            className="w-full py-3.5 text-slate-950 font-black text-xs uppercase tracking-[2px] rounded-xl hover:brightness-110 transition-all duration-300 active:scale-95 shadow-[0_0_20px_rgba(245,158,11,0.2)] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            {isGeneratingBalanceTasks ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin text-slate-950" />
+                                <span>Мастер думает...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Bot size={16} className="text-slate-950" />
+                                <span>Запросить задачи Мастера</span>
+                              </>
+                            )}
+                          </button>
+
+                          <div className="w-full py-3.5 bg-white/5 border border-white/10 opacity-60 text-slate-400 font-black text-xs uppercase tracking-[2px] rounded-xl font-sans select-none">
+                            Доступ заблокирован испытанием
+                          </div>
                         </div>
                       )}
                     </div>

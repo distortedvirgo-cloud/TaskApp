@@ -1321,3 +1321,84 @@ export const generateChronicleVictory = async (
   }
 };
 
+export const generateMasterBalanceTasks = async (
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  stat: StatType
+): Promise<{ text: string; difficulty: number }[]> => {
+  try {
+    const openai = getOpenAIClient(apiKey, baseUrl);
+    const statNames: Record<string, string> = {
+      strength: "Сила (физические тренировки, спорт, уборка, физический труд)",
+      intelligence: "Интеллект (чтение, обучение, кодинг, наука, языки)",
+      charisma: "Харизма (социальные контакты, публичные выступления, забота о внешности, общение)",
+      willpower: "Воля (медитация, планирование, отказ от вредных привычек, ранний подъем)"
+    };
+
+    const systemPrompt = `You are the Game Master / Elder Guru in a dark fantasy RPG habit tracker.
+    The player has neglected their training in the area of: "${statNames[stat] || stat}".
+    To restore balance, you must prescribe them exactly 3 real-world, actionable habits/tasks.
+
+    CRITICAL RULES:
+    1. The tasks MUST be realistic, achievable, and general real-life tasks (not fantasy metaphors like "Chop 100 oak logs with a battleaxe" - instead, write real-world things like "Сделать 20 приседаний" or "Сделать утреннюю зарядку").
+    2. Write the task descriptions in Russian.
+    3. Each task must belong strictly to this specific stat type: "${stat}".
+    4. Difficulty should be from 1 to 5 (1 is very easy, 5 is difficult).
+    5. No modern psychobabble words. Use majestic, epic, or firm medieval/RPG terminology in descriptions/names if suitable, but keep the core action 100% practical.
+
+    Return ONLY a valid JSON object matching this structure:
+    {
+      "tasks": [
+        {
+          "text": "Specific task action in Russian (e.g., Прочитать 10 страниц книги, Отжаться 15 раз)",
+          "difficulty": number (1-5)
+        }
+      ]
+    }`;
+
+    const response = await openai.chat.completions.create({
+      model: model || 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Generate 3 balance restoration tasks for stat "${stat}".` }
+      ],
+      response_format: { type: 'json_object' }
+    });
+
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Empty response from AI");
+
+    const data = extractJSON(content);
+    return data.tasks || [];
+  } catch (error) {
+    console.error("[AI Balance Tasks] Error generating balance tasks:", error);
+    // Generic high-quality fallbacks for each stat
+    const fallbacks: Record<string, { text: string; difficulty: number }[]> = {
+      strength: [
+        { text: "Выполнить 20 приседаний и утреннюю суставную разминку", difficulty: 2 },
+        { text: "Сделать интенсивную тренировку или пробежку (минимум 15 минут)", difficulty: 3 },
+        { text: "Провести влажную уборку в комнате для разминки тела", difficulty: 2 }
+      ],
+      intelligence: [
+        { text: "Прочесть 15 страниц полезной книги или учебных материалов", difficulty: 2 },
+        { text: "Изучить одну тему или написать рабочий код (30 минут)", difficulty: 3 },
+        { text: "Послушать познавательную лекцию или подкаст и законспектировать ключевые мысли", difficulty: 2 }
+      ],
+      charisma: [
+        { text: "Написать приятное сообщение или пожелать хорошего дня близкому человеку", difficulty: 1 },
+        { text: "Сделать одно доброе дело для окружающих или помочь кому-то делом", difficulty: 2 },
+        { text: "Поработать над осанкой, мимикой или речью перед зеркалом (10 минут)", difficulty: 2 }
+      ],
+      willpower: [
+        { text: "Промедитировать в полной тишине, концентрируясь на дыхании (10 минут)", difficulty: 2 },
+        { text: "Отказаться от употребления фастфуда, сладкого или газировок на весь день", difficulty: 3 },
+        { text: "Составить четкий пошаговый план дел на завтрашний день и следовать ему", difficulty: 2 }
+      ]
+    };
+    return fallbacks[stat] || [
+      { text: "Сделать зарядку для ума или тела (15 минут)", difficulty: 2 }
+    ];
+  }
+};
+
