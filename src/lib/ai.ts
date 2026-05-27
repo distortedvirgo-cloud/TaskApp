@@ -563,7 +563,8 @@ export const generateAICampaign = async (
   inventory: import('../App').Trophy[] = [], 
   nemesisBoss?: Boss, 
   chronicle?: import('../App').HeroChronicle, 
-  isReroll: boolean = false
+  isReroll: boolean = false,
+  existingTaskTexts: string[] = []
 ): Promise<{ campaign: import('../App').Campaign, masterTask?: any, newStoryContext: string, newSeasonInfo?: import('../App').HeroChronicle['season_info'] }> => {
   try {
     const openai = getOpenAIClient(apiKey, baseUrl);
@@ -671,6 +672,10 @@ export const generateAICampaign = async (
         "current_campaign": ${chronicle?.season_info?.current_campaign !== undefined ? chronicle.season_info.current_campaign + 1 : 2}
       },`;
 
+    const existingStr = existingTaskTexts.length > 0
+      ? `\n    5. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО повторять или дублировать смысл или формулировку любой из следующих существующих задач героя на карте/в списке (выберите абсолютно новое интересное действие, отличное от этих):\n    ${existingTaskTexts.join('\n    ')}`
+      : '';
+
     const systemPrompt = `You are a Game Master in an RPG habit tracker.
     Create a weekly campaign. The player will face 2-3 mini-bosses (minions) over the week, leading up to a main boss.
     
@@ -683,15 +688,15 @@ export const generateAICampaign = async (
     1. Используй качественный, живой литературный русский язык в стиле хорошего фэнтези (Ведьмак, Dragon Age, Baldur's Gate, Dark Souls, Bloodborne).
     2. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ англицизмы и геймерский сленг. НЕ используй: скилл, левел, квест, рандомный, босс, апгрейд. Заменяй их на: навык, умение, ступень, поручение, задача, чудовище, враг, улучшение.
     3. Текст должен быть естественным, избегай театрального пафоса и деепричастных оборотов.
-    4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ современные психологические термины (прокрастинация, фрустрация, депрессия, мотивация, стресс, выгорание, триггер). Описывай состояния исключительно через фэнтезийные метафоры (оцепенение, порча, тень, отчаяние, пепел души, усталость духа).
+    4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНЫ современные психологические термины (прокрастинация, фрустрация, депрессия, мотивация, стресс, выгорание, триггер). Описывай состояния исключительно через фэнтезийные метафоры (оцепенение, порча, тень, отчаяние, пепел души, усталость духа).${existingStr}
 
     ${seasonContext}
     ${nemesisPrompt}
     ${chronicleContext}
-    For each enemy, assign exactly ONE vulnerability (multiplier 1.5) and optionally ONE resistance (multiplier 0.5) to their stats (strength, intelligence, charisma, willpower). The rest should be 1.0.
+    For each boss, assign exactly ONE vulnerability (multiplier 1.5) and optionally ONE resistance (multiplier 0.5) to their stats (strength, intelligence, charisma, willpower). The rest should be 1.0.
     Also generate a small trophy/relic that drops from each boss. The effect should be microscopic to not break game balance (e.g., +1% XP to Willpower, +1.5% damage to weaknesses, -1% to future boss HP).
     For each boss, provide a single emoji that best represents them.
-    For each boss, provide a 'banter' object with 4 short phrases (one for each stat: strength, intelligence, charisma, willpower). The boss will say this phrase when hit by that stat.
+    For each boss, provide a 'banter' object containing nested health stages ('high' for HP >70%, 'medium' for HP 30%-70%, and 'low' for HP <30%). For each health stage, write 4 short phrases corresponding to the hero attributes (strength, intelligence, charisma, willpower). All statements MUST be written in Russian, spoken strictly in the first-person or representing the boss's reaction/behavior, and reflect their weakening state (e.g. proud/confident when 'high', irritated/pained when 'medium', desperate/dying when 'low').
     Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
       "theme": "Campaign theme/name in Russian",
@@ -712,10 +717,24 @@ export const generateAICampaign = async (
           "isMiniBoss": true,
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
           "banter": {
-            "strength": "Твои мышцы бесполезны!",
-            "intelligence": "Жалкие фокусы!",
-            "charisma": "Твои слова пусты!",
-            "willpower": "Твоя воля сломлена!"
+            "high": {
+              "strength": "Ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
+              "intelligence": "Твои заумные мысли рассыпаются при столкновению со мной!",
+              "charisma": "Твои речи бессильны против моего величия!",
+              "willpower": "Твоя воля не дрогнет, но моя монолитна!"
+            },
+            "medium": {
+              "strength": "Хм, твои мускулы крепче, чем казалось... Но этого недостаточно!",
+              "intelligence": "Мгх! Твоё ментальное плетение ранит меня!",
+              "charisma": "Хватит болтать! Твои слова вселяют сомнение в моё сердце...",
+              "willpower": "Арх... Твой непреклонный дух начинает подавлять мою ауру!"
+            },
+            "low": {
+              "strength": "*Истекая кровью и тяжело дыша:* Этот удар... ломает мои кости! Пощади...",
+              "intelligence": "*Царапая лицо когтями от боли разума:* Прекрати... Мои мысли плавятся от твоих чар!",
+              "charisma": "*С ужасом затыкает уши:* Замолчи! Твой праведный голос выжигает мою сущность!",
+              "willpower": "*Едва удерживая равновесие:* Нет... Мои барьеры разбиты... Твоя чистая воля сильнее!"
+            }
           },
           "dropTrophy": {
             "name": "Trophy Name in Russian",
@@ -736,6 +755,26 @@ export const generateAICampaign = async (
           "avatarEmoji": "🐉",
           "isMiniBoss": false,
           "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
+          "banter": {
+            "high": {
+              "strength": "Твои физические атаки — лишь царапины на моих доспехах!",
+              "intelligence": "И это всё твоё величие разума? Жалкие детские фокусы!",
+              "charisma": "Твоё красноречие звучит жалко. Могучие не слушают слуг!",
+              "willpower": "Твой дух упрям, но я сокрушу любую волю!"
+            },
+            "medium": {
+              "strength": "Ох... Тяжёлый замах. Твоя сила заслуживает некоторого уважения...",
+              "intelligence": "Ай! Это заклинание обжигает мои ментальные барьеры!",
+              "charisma": "Прекрати этот голос! Твой призыв мешает мне концентрироваться!",
+              "willpower": "Гррх... Твоё превозмогание заставляет меня потеть!"
+            },
+            "low": {
+              "strength": "*Преклонив колено и роняя щит:* Невероятно... Моё бессмертное тело... рушится под твоим напором...",
+              "intelligence": "*Дрожа всем телом от магического шока:* Мой разум осколками осыпается во тьму... Твоя магия непобедима...",
+              "charisma": "*Склонив голову в раскаянии:* Хватит... Твой приговор справедлив. Я побежден твоим величием...",
+              "willpower": "*Теряя последние искры жизни:* Твоя воля... разорвала моё проклятое бессмертие... Конец близок..."
+            }
+          },
           "dropTrophy": {
             "name": "Epic Trophy Name in Russian",
             "description": "Short lore description in Russian.",
@@ -779,10 +818,24 @@ export const generateAICampaign = async (
           "isMiniBoss": true,
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
           "banter": {
-            "strength": "Твои мышцы бесполезны!",
-            "intelligence": "Жалкие фокусы!",
-            "charisma": "Твои слова пусты!",
-            "willpower": "Твоя воля сломлена!"
+            "high": {
+              "strength": "Ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
+              "intelligence": "Твои заумные мысли рассыпаются при столкновению со мной!",
+              "charisma": "Твои речи бессильны против моего величия!",
+              "willpower": "Твоя воля не дрогнет, но моя монолитна!"
+            },
+            "medium": {
+              "strength": "Хм, твои мускулы крепче, чем казалось... Но этого недостаточно!",
+              "intelligence": "Мгх! Твоё ментальное плетение ранит меня!",
+              "charisma": "Хватит болтать! Твои слова вселяют сомнение в моё сердце...",
+              "willpower": "Арх... Твой непреклонный дух начинает подавлять мою ауру!"
+            },
+            "low": {
+              "strength": "*Истекая кровью и тяжело дыша:* Этот удар... ломает мои кости! Пощади...",
+              "intelligence": "*Царапая лицо когтями от боли разума:* Прекрати... Мои мысли плавятся от твоих чар!",
+              "charisma": "*С ужасом затыкает уши:* Замолчи! Твой праведный голос выжигает мою сущность!",
+              "willpower": "*Едва удерживая равновесие:* Нет... Мои барьеры разбиты... Твоя чистая воля сильнее!"
+            }
           },
           "dropTrophy": {
             "name": "Trophy Name in Russian",
@@ -803,6 +856,26 @@ export const generateAICampaign = async (
           "avatarEmoji": "🐉",
           "isMiniBoss": false,
           "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
+          "banter": {
+            "high": {
+              "strength": "Твои физические атаки — лишь царапины на моих доспехах!",
+              "intelligence": "И это всё твоё величие разума? Жалкие фокусы!",
+              "charisma": "Твоё красноречие звучит жалко. Могучие не слушают слуг!",
+              "willpower": "Твой дух упрям, но я сокрушу любую волю!"
+            },
+            "medium": {
+              "strength": "Ох... Тяжёлый замах. Твоя сила заслуживает некоторого уважения...",
+              "intelligence": "Ай! Это заклинание обжигает мои ментальные барьеры!",
+              "charisma": "Прекрати этот голос! Твой призыв мешает мне концентрироваться!",
+              "willpower": "Гррх... Твоё превозмогание заставляет меня потеть!"
+            },
+            "low": {
+              "strength": "*Преклонив колено и роняя щит:* Невероятно... Моё бессмертное тело... рушится под твоим напором...",
+              "intelligence": "*Дрожа всем телом от магического шока:* Мой разум осколками осыпается во тьму... Твоя магия непобедима...",
+              "charisma": "*Склонив голову в раскаянии:* Хватит... Твой приговор справедлив. Я побежден твоим величием...",
+              "willpower": "*Теряя последние искры жизни:* Твоя воля... разорвала моё проклятое бессмертие... Конец близок..."
+            }
+          },
           "dropTrophy": {
             "name": "Epic Trophy Name in Russian",
             "description": "Short lore description in Russian.",
@@ -877,6 +950,7 @@ export const generateAICampaign = async (
         imagePrompt: e.imagePrompt,
         defeated: false,
         isNemesis: !isMiniBoss && !!nemesisBoss,
+        banter: e.banter,
         dropTrophy: e.dropTrophy ? {
           id: crypto.randomUUID(),
           ...e.dropTrophy
@@ -1325,8 +1399,57 @@ export const generateMasterBalanceTasks = async (
   apiKey: string,
   baseUrl: string,
   model: string,
-  stat: StatType
+  stat: StatType,
+  count: number = 3,
+  existingTaskTexts: string[] = []
 ): Promise<{ text: string; difficulty: number }[]> => {
+  const fallbacks: Record<string, { text: string; difficulty: number }[]> = {
+    strength: [
+      { text: "Выполнить 20 приседаний и утреннюю суставную разминку", difficulty: 2 },
+      { text: "Сделать интенсивную тренировку или пробежку (минимум 15 минут)", difficulty: 3 },
+      { text: "Провести влажную уборку в комнате для разминки тела", difficulty: 2 },
+      { text: "Выполнить планку 3 подхода по 45 секунд", difficulty: 2 },
+      { text: "Сделать 15 отжиманий с правильной техникой", difficulty: 2 },
+      { text: "Пройти пешком 8000 шагов на свежем воздухе", difficulty: 1 },
+      { text: "Выполнить растяжку всего тела после рабочего дня (10 минут)", difficulty: 1 },
+      { text: "Выполнить 30 прыжков 'Джампинг Джек' для разгона лимфы", difficulty: 2 },
+      { text: "Сделать разминку для шеи и плечевого пояса (5 минут)", difficulty: 1 }
+    ],
+    intelligence: [
+      { text: "Прочесть 15 страниц полезной книги или учебных материалов", difficulty: 2 },
+      { text: "Изучить одну тему или написать рабочий код (30 минут)", difficulty: 3 },
+      { text: "Послушать познавательную лекцию или подкаст и законспектировать ключевые мысли", difficulty: 2 },
+      { text: "Разобрать сложную задачу или решить 3 головоломки", difficulty: 2 },
+      { text: "Выучить 10 новых иностранных слов и составить с ними предложения", difficulty: 2 },
+      { text: "Посмотреть документальный научный фильм (минимум 20 минут)", difficulty: 1 },
+      { text: "Составить аналитический отчет или резюме прочитанной статьи", difficulty: 2 },
+      { text: "Повторить пройденный материал или настроить учебный план", difficulty: 2 },
+      { text: "Улучшить один рабочий процесс или написать полезный скрипт", difficulty: 3 }
+    ],
+    charisma: [
+      { text: "Написать приятное сообщение или пожелать хорошего дня близкому человеку", difficulty: 1 },
+      { text: "Сделать одно доброе дело для окружающих или помочь кому-то делом", difficulty: 2 },
+      { text: "Поработать над осанкой, мимикой или речью перед зеркалом (10 минут)", difficulty: 2 },
+      { text: "Поделиться полезным советом или интересной новостью в беседе", difficulty: 1 },
+      { text: "Сделать комплимент коллеге, другу или прохожему", difficulty: 1 },
+      { text: "Провести качественное время с близкими без телефонов (30 минут)", difficulty: 2 },
+      { text: "Убраться на письменном столе или организовать презентабельный вид", difficulty: 2 },
+      { text: "Познакомиться или заговорить на свободную тему с новым человеком", difficulty: 3 },
+      { text: "Поддержать позитивный разговор и внимательно выслушать собеседника", difficulty: 2 }
+    ],
+    willpower: [
+      { text: "Промедитировать в полной тишине, концентрируясь на дыхании (10 минут)", difficulty: 2 },
+      { text: "Отказаться от употребления фастфуда, сладкого или газировок на весь день", difficulty: 3 },
+      { text: "Составить четкий пошаговый план дел на завтрашний день и следовать ему", difficulty: 2 },
+      { text: "Проснуться сразу по первому звонку будильника без переносов", difficulty: 3 },
+      { text: "Сделать самую неприятную/важную задачу первым делом (метод 'съесть лягушку')", difficulty: 3 },
+      { text: "Провести цифровой детокс — 1 час полной тишины без гаджетов", difficulty: 2 },
+      { text: "Употребить норму чистой воды за день (минимум 1.5 - 2 литра)", difficulty: 1 },
+      { text: "Очистить список входящих писем или завершить давний 'висяк'", difficulty: 2 },
+      { text: "Принять контрастный душ для укрепления духа и воли", difficulty: 2 }
+    ]
+  };
+
   try {
     const openai = getOpenAIClient(apiKey, baseUrl);
     const statNames: Record<string, string> = {
@@ -1336,16 +1459,21 @@ export const generateMasterBalanceTasks = async (
       willpower: "Воля (медитация, планирование, отказ от вредных привычек, ранний подъем)"
     };
 
+    const existingStr = existingTaskTexts.length > 0 
+      ? `\n    6. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО повторять или дублировать смысл или формулировку любой из следующих существующих задач героя:\n    ${existingTaskTexts.join('\n    ')}`
+      : '';
+
     const systemPrompt = `You are the Game Master / Elder Guru in a dark fantasy RPG habit tracker.
     The player has neglected their training in the area of: "${statNames[stat] || stat}".
-    To restore balance, you must prescribe them exactly 3 real-world, actionable habits/tasks.
+    To restore balance, you must prescribe them exactly ${count} real-world, actionable habits/tasks.
 
     CRITICAL RULES:
     1. The tasks MUST be realistic, achievable, and general real-life tasks (not fantasy metaphors like "Chop 100 oak logs with a battleaxe" - instead, write real-world things like "Сделать 20 приседаний" or "Сделать утреннюю зарядку").
     2. Write the task descriptions in Russian.
     3. Each task must belong strictly to this specific stat type: "${stat}".
     4. Difficulty should be from 1 to 5 (1 is very easy, 5 is difficult).
-    5. No modern psychobabble words. Use majestic, epic, or firm medieval/RPG terminology in descriptions/names if suitable, but keep the core action 100% practical.
+    5. No modern psychobabble words. Use majestic, epic, or firm medieval/RPG terminology in descriptions/names if suitable, but keep the core action 100% practical.${existingStr}
+    7. All generated tasks MUST be completely unique and distinct from each other. Do not include duplicate or near-duplicate tasks in this response.
 
     Return ONLY a valid JSON object matching this structure:
     {
@@ -1361,7 +1489,7 @@ export const generateMasterBalanceTasks = async (
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Generate 3 balance restoration tasks for stat "${stat}".` }
+        { role: 'user', content: `Generate ${count} balance restoration tasks for stat "${stat}".` }
       ],
       response_format: { type: 'json_object' }
     });
@@ -1370,35 +1498,71 @@ export const generateMasterBalanceTasks = async (
     if (!content) throw new Error("Empty response from AI");
 
     const data = extractJSON(content);
-    return data.tasks || [];
+    const aiTasks: { text: string; difficulty: number }[] = data.tasks || [];
+    
+    const existingLowerSet = new Set(existingTaskTexts.map(t => t.trim().toLowerCase()));
+    const finalTasks: { text: string; difficulty: number }[] = [];
+    const seenNewLower = new Set<string>();
+
+    for (const at of aiTasks) {
+      if (!at.text) continue;
+      const trimLower = at.text.trim().toLowerCase();
+      if (!existingLowerSet.has(trimLower) && !seenNewLower.has(trimLower)) {
+        finalTasks.push(at);
+        seenNewLower.add(trimLower);
+      }
+    }
+
+    // Top up if we didn't get enough unique tasks
+    if (finalTasks.length < count) {
+      const pool = fallbacks[stat] || [{ text: "Сделать зарядку для ума или тела (15 минут)", difficulty: 2 }];
+      let suffixCounter = 1;
+      for (const candidate of pool) {
+        if (finalTasks.length >= count) break;
+        const candLower = candidate.text.trim().toLowerCase();
+        if (!existingLowerSet.has(candLower) && !seenNewLower.has(candLower)) {
+          finalTasks.push(candidate);
+          seenNewLower.add(candLower);
+        }
+      }
+
+      // If still not enough, force unique texts by appending custom stage counter
+      while (finalTasks.length < count) {
+        const candidate = pool[Math.floor(Math.random() * pool.length)] || { text: "Восстановить баланс", difficulty: 2 };
+        const suffixText = `${candidate.text} (Испытание ${suffixCounter++})`;
+        finalTasks.push({ text: suffixText, difficulty: candidate.difficulty });
+      }
+    }
+
+    return finalTasks.slice(0, count);
   } catch (error) {
     console.error("[AI Balance Tasks] Error generating balance tasks:", error);
     // Generic high-quality fallbacks for each stat
-    const fallbacks: Record<string, { text: string; difficulty: number }[]> = {
-      strength: [
-        { text: "Выполнить 20 приседаний и утреннюю суставную разминку", difficulty: 2 },
-        { text: "Сделать интенсивную тренировку или пробежку (минимум 15 минут)", difficulty: 3 },
-        { text: "Провести влажную уборку в комнате для разминки тела", difficulty: 2 }
-      ],
-      intelligence: [
-        { text: "Прочесть 15 страниц полезной книги или учебных материалов", difficulty: 2 },
-        { text: "Изучить одну тему или написать рабочий код (30 минут)", difficulty: 3 },
-        { text: "Послушать познавательную лекцию или подкаст и законспектировать ключевые мысли", difficulty: 2 }
-      ],
-      charisma: [
-        { text: "Написать приятное сообщение или пожелать хорошего дня близкому человеку", difficulty: 1 },
-        { text: "Сделать одно доброе дело для окружающих или помочь кому-то делом", difficulty: 2 },
-        { text: "Поработать над осанкой, мимикой или речью перед зеркалом (10 минут)", difficulty: 2 }
-      ],
-      willpower: [
-        { text: "Промедитировать в полной тишине, концентрируясь на дыхании (10 минут)", difficulty: 2 },
-        { text: "Отказаться от употребления фастфуда, сладкого или газировок на весь день", difficulty: 3 },
-        { text: "Составить четкий пошаговый план дел на завтрашний день и следовать ему", difficulty: 2 }
-      ]
-    };
-    return fallbacks[stat] || [
+    const pool = fallbacks[stat] || [
       { text: "Сделать зарядку для ума или тела (15 минут)", difficulty: 2 }
     ];
+    
+    const existingLowerSet = new Set(existingTaskTexts.map(t => t.trim().toLowerCase()));
+    const finalTasks: { text: string; difficulty: number }[] = [];
+    const seenNewLower = new Set<string>();
+
+    for (const item of pool) {
+      if (finalTasks.length >= count) break;
+      const candLower = item.text.trim().toLowerCase();
+      if (!existingLowerSet.has(candLower) && !seenNewLower.has(candLower)) {
+        finalTasks.push(item);
+        seenNewLower.add(candLower);
+      }
+    }
+
+    let suffixCounter = 1;
+    while (finalTasks.length < count) {
+      const candidate = pool[Math.floor(Math.random() * pool.length)] || { text: "Восстановить баланс", difficulty: 2 };
+      const suffixText = `${candidate.text} (Испытание ${suffixCounter++})`;
+      finalTasks.push({ text: suffixText, difficulty: candidate.difficulty });
+    }
+
+    return finalTasks.slice(0, count);
   }
 };
 
@@ -1497,7 +1661,7 @@ export const generateAllBossBanter = async (
   model: string,
   bossName: string,
   bossDescription: string
-): Promise<Record<string, string>> => {
+): Promise<any> => {
   try {
     if (!apiKey) throw new Error("API Key configuration missing");
     const openai = getOpenAIClient(apiKey, baseUrl);
@@ -1505,30 +1669,45 @@ export const generateAllBossBanter = async (
     const systemPrompt = `You are the Boss named "${bossName}" in a dark fantasy RPG habit tracker.
     The description of you is: "${bossDescription}".
     
-    You must pre-generate exactly four damage banter phrases/hurt statements in Russian – one for each of the following hero attributes representing the type of attack you received:
+    You must pre-generate exactly twelve damage banter phrases/hurt statements in Russian – grouped by boss health level ('high' for HP >70%, 'medium' for HP 30%-70%, and 'low' for HP <30%). 
+    For each health stage, write one phrase corresponding to each of the following hero attributes representing the type of attack you received:
     - strength (physical training, athletic strike)
     - intelligence (mind magic, spell, educational insight)
     - charisma (mental influence, verbal wit, presence)
     - willpower (unbending spirit, meditation, self-discipline check)
 
     CRITICAL RULES:
-    1. Each phrase MUST be short (maximum 1-2 short sentences, 5 to 15 words).
-    2. Write exclusively in Russian, from the first-person perspective of the boss "${bossName}".
-    3. Give the phrases a unique atmospheric flavor matching the boss's name and description (e.g. frozen/wolf motifs for Fenrir, void/corruption/abyss, etc.).
-    4. Do not include game mechanics or numbers in the dialogue. Keep the style dark fantasy, epic, monstrous, or proud.
-    5. Return ONLY a valid JSON object matching this structure:
+    1. Each phrase MUST be short (maximum 1-2 short sentences, 5 to 15 words) or describe the boss's actions/reactions (e.g. "*Морщась от боли:* Твоё плетение пробивает мою ментальную защиту... Жалкий червь!").
+    2. Write exclusively in Russian, strictly from the first-person perspective or describing the actions of the boss "${bossName}".
+    3. Encourage atmospheric medieval flavor matching the boss's name and description (e.g., icy/wolf motifs for Fenrir, void/darkness/chaos).
+    4. Ensure they sound noticeably weaker, desperate, or heavily wounded when 'low' health, irritated/fighting back when 'medium', and proud/confident when 'high'.
+    5. Return ONLY a valid JSON object matching this exact structure:
     {
-      "strength": "...",
-      "intelligence": "...",
-      "charisma": "...",
-      "willpower": "..."
+      "high": {
+        "strength": "...",
+        "intelligence": "...",
+        "charisma": "...",
+        "willpower": "..."
+      },
+      "medium": {
+        "strength": "...",
+        "intelligence": "...",
+        "charisma": "...",
+        "willpower": "..."
+      },
+      "low": {
+        "strength": "...",
+        "intelligence": "...",
+        "charisma": "...",
+        "willpower": "..."
+      }
     }`;
 
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Pre-generate 4 banter lines for boss "${bossName}" matching the specified JSON format.` }
+        { role: 'user', content: `Pre-generate 12 pained banter phrases for boss "${bossName}" grouped by health levels matching the specified JSON structure.` }
       ],
       response_format: { type: 'json_object' },
       temperature: 0.8
@@ -1539,14 +1718,19 @@ export const generateAllBossBanter = async (
 
     const data = extractJSON(content);
     if (data && typeof data === 'object') {
-      const result: Record<string, string> = {};
-      const stats = ['strength', 'intelligence', 'charisma', 'willpower'];
-      stats.forEach(key => {
-        if (data[key]) {
-          result[key] = data[key].replace(/^["'«“]|["'»”]$/g, '').trim();
-        }
+      const isValid = ['high', 'medium', 'low'].every(stage => {
+        return data[stage] && typeof data[stage] === 'object' &&
+          ['strength', 'intelligence', 'charisma', 'willpower'].every(stat => typeof data[stage][stat] === 'string');
       });
-      if (Object.keys(result).length === 4) {
+
+      if (isValid) {
+        // Clean phrases
+        const result: any = { high: {}, medium: {}, low: {} };
+        ['high', 'medium', 'low'].forEach(stg => {
+          ['strength', 'intelligence', 'charisma', 'willpower'].forEach(stat => {
+            result[stg][stat] = data[stg][stat].replace(/^["'«“]|["'»”]$/g, '').trim();
+          });
+        });
         return result;
       }
     }
@@ -1554,48 +1738,121 @@ export const generateAllBossBanter = async (
   } catch (error) {
     console.warn("[AI Boss Banter] Fallback banter pre-generation used:", error);
     
-    // Custom beautiful fallback generator based on names
     const lowerName = bossName.toLowerCase();
-    const fallbacks: Record<string, Record<string, string>> = {
-      "левиафан": {
-        strength: "Глупец! Твоя сталь лишь царапает мою вековую океанскую чешую!",
-        intelligence: "Твои плетения разума рассеиваются в бесконечном течении пучины!",
-        charisma: "Твои сладкие речи заглушаются ревом прилива. Море безмолвно!",
-        willpower: "Твое превозмогание — лишь мелкая волна перед моим вечным давлением!"
-      },
-      "аматерасу": {
-        strength: "Физическая сила тщетна перед сиянием великого вечного солнца!",
-        intelligence: "Твой мизерный интеллект гаснет при свете божественного огня!",
-        charisma: "Перед моим величием меркнет любая смертная харизма!",
-        willpower: "Твоя хрупкая воля сгорит дотла в моем небесном пламени!"
-      },
-      "ёрмунганд": {
-        strength: "Твой разрушительный удар бессилен против колец Мирового Змея!",
-        intelligence: "Твои хитрые формулы не разорвут бесконечную цепь судьбы!",
-        charisma: "Ш-ш-ссс... Твое очарование не остановит неотвратимый яд забвения!",
-        willpower: "Твой дух крепок, но колесо времени все равно обратит тебя в прах!"
-      },
-      "фенрир": {
-        strength: "Твоя сталь лишь злит зверя! Мои железные цепи рвутся!",
-        intelligence: "Твои коварные планы рассыплются от одного удара моих когтей!",
-        charisma: "Твой пустой лепет прекратится, когда мои клыки сомкнутся на твоем горле!",
-        willpower: "Твоя воля горит ярко, но первобытная тьма все равно поглотит этот свет!"
-      }
-    };
+    const isLeviathan = lowerName.includes("левиафан");
+    const isAmaterasu = lowerName.includes("аматерасу");
+    const isJormungand = lowerName.includes("ёрмунганд");
+    const isFenrir = lowerName.includes("фенрир");
 
-    let matchKey = Object.keys(fallbacks).find(k => lowerName.includes(k));
-    if (matchKey) {
-      return fallbacks[matchKey];
-    } else {
+    if (isLeviathan) {
       return {
-        strength: `Ха-ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!`,
-        intelligence: `Твои заумные мысли и фокусы разума рассыпаются при столкновении со мной!`,
-        charisma: `Ты мнишь себя красноречивым лидером? Твои слова бессильны против моего величия!`,
-        willpower: `Ты закаляешь свой дух, но моя воля монолитна и не дрогнет от твоих потуг!`
+        high: {
+          strength: "Глупец! Твоя сталь лишь царапает мою вековую океанскую чешую!",
+          intelligence: "Твои плетения разума рассеиваются в бесконечном течении пучины!",
+          charisma: "Твои сладкие речи заглушаются ревом прилива. Море безмолвно!",
+          willpower: "Твое превозмогание — лишь мелкая волна перед моим вечным давлением!"
+        },
+        medium: {
+          strength: "*Морщится, когда вода вскипает:* Ты крепче, чем кажешься... Мои волны вздымаются!",
+          intelligence: "*Воет от боли разума:* Твои мантры проникают сквозь бездну! Это жалко ранит меня!",
+          charisma: "*Разъяренно шипит:* Твой голос будоражит мои глубины! Замолчи, смертный!",
+          willpower: "*Пошатываясь среди волн:* Твоя стальная воля... начинает вызывать бурю во мне!"
+        },
+        low: {
+          strength: "*Истекая соленой кровью, падает на дно:* Невероятно... Океан... замерзает... Твоя сила сломила меня!",
+          intelligence: "*Тяжело вздыхая, теряя рассудок:* Великая бездна гаснет... Твои чары... высушили мои глубины...",
+          charisma: "*Склонив тяжелую голову:* Довольно... Твой праведный укор... заставляет меня уйти во мрак...",
+          willpower: "*Едва дыша среди пены:* Твоя непобедимая воля... иссушила море... Конец близок..."
+        }
+      };
+    } else if (isAmaterasu) {
+      return {
+        high: {
+          strength: "Физическая сила тщетна перед сиянием великого вечного солнца!",
+          intelligence: "Твой мизерный интеллект гаснет при свете божественного огня!",
+          charisma: "Перед моим величием меркнет любая смертная харизма!",
+          willpower: "Твоя хрупкая воля сгорит дотла в моем небесном пламени!"
+        },
+        medium: {
+          strength: "*Закрывается веером от удара:* Твоя сталь упряма... Но солнце вечно!",
+          intelligence: "*Морщится от магического разряда:* Мое сияние дрогнуло... Наглый еретик!",
+          charisma: "*Гневно сверкает глазами:* Твоя дерзкая харизма... заслоняет мой чистый свет!",
+          willpower: "*Держится за сердце:* Твое превозмогание... начинает обжигать мою собственную ауру!"
+        },
+        low: {
+          strength: "*Падая на колени, теряя благословение:* Солнце заходит... Твой удар... рассеивает мой рассвет...",
+          intelligence: "*Пошатываясь в угасающем пламени:* Мой свет остывает... Твоя мудрость разрывает мои небеса...",
+          charisma: "*Уронив веер, плачет:* Твои праведные слова... вернули тьму в мою пещеру... Я гасну...",
+          willpower: "*Едва видимая в лучах заката:* Чистая искра твоего духа... победила вечный огонь..."
+        }
+      };
+    } else if (isJormungand) {
+      return {
+        high: {
+          strength: "Твой разрушительный удар бессилен против колец Мирового Змея!",
+          intelligence: "Твои хитрые формулы не разорвут бесконечную цепь судьбы!",
+          charisma: "Ш-ш-ссс... Твое очарование не остановит неотвратимый яд забвения!",
+          willpower: "Твой дух крепок, но колесо времени все равно обратит тебя в прах!"
+        },
+        medium: {
+          strength: "*Шипит со злостью, сжимая кольца:* Твоя сталь рассекает чешую! Но я вечен!",
+          intelligence: "*Яростно качает головой:* Твоя магия разума... путает мои вековые циклы!",
+          charisma: "*Трясет хвостом в гневе:* Ш-ш-ссс... Хватит вещать! Твои речи вызывают головную боль!",
+          willpower: "*Тяжело содрогается:* Твоя воля воистину сильна... Мои кольца дрожат!"
+        },
+        low: {
+          strength: "*Истекая ядом, с хрустом падает:* Мировой круг порван... Кости ломаются... Твоя сила сокрушила вечность...",
+          intelligence: "*Угасающие глаза застилает туман:* Мой змеиный разум растворяется... Судьба побеждена твоей мудростью...",
+          charisma: "*Опускается в прах с тихим шепотом:* Мой ядовитый шепот стих... Твой суровый глас победил...",
+          willpower: "*Теряя последние силы:* Цепь разорвана... Твоя стальная воля победила судьбу..."
+        }
+      };
+    } else if (isFenrir) {
+      return {
+        high: {
+          strength: "Твоя сталь лишь злит зверя! Мои железные цепи рвутся!",
+          intelligence: "Твои коварные планы рассыплются от одного удара моих когтей!",
+          charisma: "Твой пустой лепет прекратится, когда мои клыки сомкнутся на твоем горле!",
+          willpower: "Твоя воля горит ярко, но первобытная тьма все равно поглотит этот свет!"
+        },
+        medium: {
+          strength: "*Рычит от ярости, утирая морду:* Приятный удар! Но волчьи клыки все еще остры!",
+          intelligence: "*Поскуливает от вспышки света:* Твои заклятья обжигают мои вековые инстинкты!",
+          charisma: "*Старается перекричать вас воем:* Ау-у-у! Твои речи вселяют страх в моих приспешников!",
+          willpower: "*Скрежещет когтями от напряжения:* Твое сопротивление... начинает сковывать мою дикость!"
+        },
+        low: {
+          strength: "*С воем валится на бок, истекая кровью:* Мои клыки... сломаны... Твоя стальная рука одолела зверя...",
+          intelligence: "*Скуля уползает назад:* Твоя магия ослепила меня... Зверь повержен во тьму разума...",
+          charisma: "*Дрожа, поджимая хвост:* Твой голос... твое неоспоримое величие заставило меня покориться...",
+          willpower: "*Слабо дыша на окровавленном снегу:* Твой дух... разбил мои оковы и поглотил мою ярость..."
+        }
+      };
+    } else {
+      // Default Generic structured health-grouped banter
+      return {
+        high: {
+          strength: "Ха-ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
+          intelligence: "Твои заумные мысли и фокусы разума рассыпаются при столкновении со мной!",
+          charisma: "Ты мнишь себя красноречивым лидером? Твои слова бессильны против моего величия!",
+          willpower: "Ты закаляешь свой дух, но моя воля монолитна и не дрогнет от твоих потуг!"
+        },
+        medium: {
+          strength: "*Слегка морщится от удара:* Хм, твоя физическая мощь заслуживает уважения... Но этого мало!",
+          intelligence: "*Хмурится от вспышки энергии:* Твоя хваленая магия сумела задеть мои барьеры!",
+          charisma: "*Недовольно рычит:* Хватит пустых речей! Твой голос раздражает мои уши!",
+          willpower: "*Тяжело содрогается:* Твоё превозмогание... начинает давить на мою уверенность!"
+        },
+        low: {
+          strength: "*Качаясь на ногах и истекая кровью:* Невероятно... Ты сокрушаешь мое тело... Я теряю силы...",
+          intelligence: "*Схватившись за пылающую голову:* Мой разум затуманился... Твой интеллект выжег мою суть...",
+          charisma: "*Преклонив колена от стыда:* Твой величественный голос... заставил меня покаяться в грехах...",
+          willpower: "*С трудом испуская последний вздох:* Твоя стальная воля... сокрушила мое темное бессмертие..."
+        }
       };
     }
   }
-};
+};;
 
 
 

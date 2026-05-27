@@ -234,7 +234,7 @@ export type Boss = {
   escaped?: boolean;
   isNemesis?: boolean;
   dropTrophy?: Trophy;
-  banter?: Record<string, string>;
+  banter?: Record<string, any>;
 };
 
 export type Campaign = {
@@ -343,6 +343,99 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
   const daysToAdd = isMiniBoss ? 1 : 6;
   const expirationDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd, 23, 59, 59, 999);
 
+  const getLocalBossBanter = (bossName: string) => {
+    const lowerName = bossName.toLowerCase();
+    const isLeviathan = lowerName.includes("левиафан") || lowerName.includes("кракен") || lowerName.includes("цербер");
+    const isAmaterasu = lowerName.includes("аматерасу") || lowerName.includes("бафомет") || lowerName.includes("химера");
+    const isJormungand = lowerName.includes("ёрмунганд") || lowerName.includes("минотавр") || lowerName.includes("медуза");
+
+    if (isLeviathan) {
+      return {
+        high: {
+          strength: "Глупец! Твоя сталь лишь царапает мою вековую океанскую защиту!",
+          intelligence: "Твои плетения разума рассеиваются в бесконечном течении пучины!",
+          charisma: "Твои сладкие речи заглушаются ревом прилива. Море безмолвно!",
+          willpower: "Твое превозмогание — лишь мелкая волна перед моим вечным давлением!"
+        },
+        medium: {
+          strength: "*Морщится, когда вода вскипает:* Ты крепче, чем кажешься... Мои волны вздымаются!",
+          intelligence: "*Воет от боли разума:* Твои мантры проникают сквозь бездну! Это жалко ранит меня!",
+          charisma: "*Разъяренно шипит:* Твой голос будоражит мои глубины! Замолчи, смертный!",
+          willpower: "*Пошатываясь среди волн:* Твоя стальная воля... начинает вызывать бурю во мне!"
+        },
+        low: {
+          strength: "*Истекая соленой кровью, падает на дно:* Невероятно... Океан... замерзает... Твоя сила сломила меня!",
+          intelligence: "*Тяжело вздыхая, теряя рассудок:* Великая бездна гаснет... Твои чары... высушили мои глубины...",
+          charisma: "*Склонив тяжелую голову:* Довольно... Твой праведный укор... заставляет меня уйти во мрак...",
+          willpower: "*Едва дыша среди пены:* Твоя непобедимая воля... иссушила море... Конец близок..."
+        }
+      };
+    } else if (isAmaterasu) {
+      return {
+        high: {
+          strength: "Физическая сила тщетна перед сиянием великого вечного солнца!",
+          intelligence: "Твой мизерный интеллект гаснет при свете божественного огня!",
+          charisma: "Перед моим величием меркнет любая смертная харизма!",
+          willpower: "Твоя хрупкая воля сгорит дотла в моем небесном пламени!"
+        },
+        medium: {
+          strength: "*Закрывается веером от удара:* Твоя сталь упряма... Но солнце вечно!",
+          intelligence: "*Морщится от магического разряда:* Мое сияние дрогнуло... Наглый еретик!",
+          charisma: "*Гневно сверкает глазами:* Твоя дерзкая харизма... заслоняет мой чистый свет!",
+          willpower: "*Держится за сердце:* Твое превозмогание... начинает обжигать мою собственную ауру!"
+        },
+        low: {
+          strength: "*Падая на колени, теряя благословение:* Солнце заходит... Твой удар... рассеивает мой рассвет...",
+          intelligence: "*Пошатываясь в угасающем пламени:* Мой свет остывает... Твоя мудрость разрывает мои небеса...",
+          charisma: "*Уронив веер, плачет:* Твои праведные слова... вернули тьму в мою пещеру... Я гасну...",
+          willpower: "*Едва видимая в лучах заката:* Чистая искра твоего духа... победила вечный огонь..."
+        }
+      };
+    } else if (isJormungand) {
+      return {
+        high: {
+          strength: "Твой разрушительный удар бессилен против преград Мирового Змея!",
+          intelligence: "Твои хитрые формулы не разорвут бесконечную цепь судьбы!",
+          charisma: "Ш-ш-ссс... Твое очарование не остановит неотвратимый яд забвения!",
+          willpower: "Твой дух крепок, но колесо времени все равно обратит тебя в прах!"
+        },
+        medium: {
+          strength: "*Шипит со злостью, сжимая кольца:* Твоя сталь рассекает чешую! Но я вечен!",
+          intelligence: "*Яростно качает головой:* Твоя магия разума... путает мои вековые циклы!",
+          charisma: "*Трясет хвостом в гневе:* Ш-ш-ссс... Хватит вещать! Твои речи вызывают головную боль!",
+          willpower: "*Тяжело содрогается:* Твоя воля воистину сильна... Мои кольца дрожат!"
+        },
+        low: {
+          strength: "*Истекая ядом, с хрустом падает:* Мировой круг порван... Кости ломаются... Твоя сила сокрушила вечность...",
+          intelligence: "*Угасающие глаза застилает туман:* Мой змеиный разум растворяется... Судьба побеждена твоей мудростью...",
+          charisma: "*Опускается в прах с тихим шепотом:* Мой ядовитый шепот стих... Твой суровый глас победил...",
+          willpower: "*Теряя последние силы:* Цепь разорвана... Твоя стальная воля победила судьбу..."
+        }
+      };
+    } else {
+      return {
+        high: {
+          strength: "Ха-ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
+          intelligence: "Твои заумные мысли и фокусы разума рассыпаются при столкновении со мной!",
+          charisma: "Ты мнишь себя красноречивым лидером? Твои слова бессильны против моего величия!",
+          willpower: "Ты закаляешь свой дух, но моя воля монолитна и не дрогнет от твоих потуг!"
+        },
+        medium: {
+          strength: "*Слегка морщится от удара:* Хм, твоя физическая мощь заслуживает уважения... Но этого мало!",
+          intelligence: "*Хмурится от энергии:* Твоя хваленая магия сумела задеть мои барьеры!",
+          charisma: "*Недовольно рычит:* Хватит пустых речей! Твой голос раздражает мои уши!",
+          willpower: "*Тяжело содрогается:* Твоё превозмогание... начинает давить на мою уверенность!"
+        },
+        low: {
+          strength: "*Качаясь на ногах и истекая кровью:* Невероятно... Ты сокрушаешь мое тело... Я теряю силы...",
+          intelligence: "*Схватившись за пылающую голову:* Мой разум затуманился... Твой интеллект выжег мою суть...",
+          charisma: "*Преклонив колена от стыда:* Твой величественный голос... заставил меня покаяться в грехах...",
+          willpower: "*С трудом испуская последний вздох:* Твоя стальная воля... сокрушила мое темное бессмертие..."
+        }
+      };
+    }
+  };
+
   return {
     id: crypto.randomUUID(),
     level: playerLevel,
@@ -354,6 +447,7 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
     expiresAt: expirationDate.getTime(),
     multipliers,
     isMiniBoss,
+    banter: getLocalBossBanter(bossData.name),
     defeated: false,
     dropTrophy: {
       id: crypto.randomUUID(),
@@ -489,6 +583,143 @@ const defaultPendingDamage = {
   unknown: 0
 };
 
+const getBossBanterLine = (boss: Boss, stat: StatType): string => {
+  if (!boss) return "Рх-х! Твой удар горяч, но моя броня крепка!";
+
+  // Calculate health stage: 'high' | 'medium' | 'low'
+  const hpPercent = (boss.hp / boss.maxHp) * 100;
+  let healthStage: 'high' | 'medium' | 'low' = 'high';
+  if (hpPercent < 30) {
+    healthStage = 'low';
+  } else if (hpPercent < 70) {
+    healthStage = 'medium';
+  }
+
+  const currentBanter = boss.banter as any;
+  if (currentBanter) {
+    // 1. Check nested structure: banter[healthStage][stat]
+    if (currentBanter[healthStage] && typeof currentBanter[healthStage] === 'object') {
+      const stageGroup = currentBanter[healthStage];
+      if (stageGroup[stat]) {
+        return stageGroup[stat];
+      }
+    }
+    // 2. Check flat structure: banter[stat] (old format fallback)
+    if (currentBanter[stat] && typeof currentBanter[stat] === 'string') {
+      const baseLine = currentBanter[stat];
+      if (healthStage === 'low') {
+        return `*Тяжело дыша и истекая кровью:* "${baseLine}"`;
+      } else if (healthStage === 'medium') {
+        return `*Морщась от боли:* "${baseLine}"`;
+      } else {
+        return `*Свысока и властно:* "${baseLine}"`;
+      }
+    }
+  }
+
+  // 3. Complete robust programmatic fallback based on the chosen boss or general theme
+  const lowerName = boss.name.toLowerCase();
+  const isLeviathan = lowerName.includes("левиафан") || lowerName.includes("кракен") || lowerName.includes("цербер");
+  const isAmaterasu = lowerName.includes("аматерасу") || lowerName.includes("бафомет") || lowerName.includes("химера");
+  const isJormungand = lowerName.includes("ёрмунганд") || lowerName.includes("минотавр") || lowerName.includes("медуза");
+
+  const fallbackPools: Record<string, Record<'high'|'medium'|'low', string>> = {
+    strength: {
+      high: "Ха-ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
+      medium: "*Стиснув зубы от удара:* Твои мускулы крепче, чем казалось... Но этого мало!",
+      low: "*Падая на колено и тяжело дыша:* Этот удар... сокрушает мои кости... Но я еще не повержен!"
+    },
+    intelligence: {
+      high: "Твои заумные мысли и фокусы разума рассыпаются при столкновении со мной!",
+      medium: "*Хмурясь, рассеивает заклятие:* Твоё плетение пробивает мою ментальную защиту... Жалкий червь!",
+      low: "*Стеклянными глазами, вцепившись в голову:* Мои мысли гаснут... эти чары... они разрывают мой разум!"
+    },
+    charisma: {
+      high: "Ты мнишь себя красноречивым лидером? Твои слова бессильны против моего величия!",
+      medium: "*Старается не слушать ваш голос:* Замолчи! Твои речи вселяют сомнение в моё сердце...",
+      low: "*Затыкает уши, дрожа от раскаяния:* Хватит... Твой голос... твоё величие ослепляет меня!"
+    },
+    willpower: {
+      high: "Ты закаляешь свой дух, но моя воля монолитна и не дрогнет!",
+      medium: "*Слегка покачнувшись:* Твой стальной дух... начинает подавлять мою ауру!",
+      low: "*Едва удерживая баланс, теряя волю за волей:* Моё превосходительство... рушится... Твоя чистая воля сильнее!"
+    }
+  };
+
+  const specificLeviathan: Record<string, Record<'high'|'medium'|'low', string>> = {
+    strength: {
+      high: "Глупец! Твоя сталь лишь царапает мою вековую океанскую защиту!",
+      medium: "*Морщится, когда вода вскипает:* Ты крепче, чем кажешься... Мои волны вздымаются!",
+      low: "*Истекая соленой кровью, падает на дно:* Невероятно... Океан... замерзает... Твоя сила сломила меня!"
+    },
+    intelligence: {
+      high: "Твои плетения разума рассеиваются в бесконечном течении пучины!",
+      medium: "*Воет от боли разума:* Твои мантры проникают сквозь бездну! Это жалко ранит меня!",
+      low: "*Тяжело вздыхая, теряя рассудок:* Великая бездна гаснет... Твои чары... высушили мои глубины..."
+    },
+    charisma: {
+      high: "Твои сладкие речи заглушаются ревом прилива. Море безмолвно!",
+      medium: "*Разъяренно шипит:* Твой голос будоражит мои глубины! Замолчи, смертный!",
+      low: "*Склонив тяжелую голову:* Довольно... Твой праведный укор... заставляет меня уйти во мрак..."
+    },
+    willpower: {
+      high: "Твое превозмогание — лишь мелкая волна перед моим вечным давлением!",
+      medium: "*Пошатываясь среди волн:* Твоя стальная воля... начинает вызывать бурю во мне!",
+      low: "*Едва дыша среди пены:* Твоя непобедимая воля... иссушила море... Конец близок..."
+    }
+  };
+
+  const specificAmaterasu: Record<string, Record<'high'|'medium'|'low', string>> = {
+    strength: {
+      high: "Физическая сила тщетна перед сиянием великого вечного солнца!",
+      medium: "*Закрывается веером от удара:* Твоя сталь упряма... Но солнце вечно!",
+      low: "*Падая на колени, теряя благословение:* Солнце заходит... Твой удар... рассеивает мой рассвет..."
+    },
+    intelligence: {
+      high: "Твой мизерный интеллект гаснет при свете божественного огня!",
+      medium: "*Морщится от магического разряда:* Мое сияние дрогнуло... Наглый еретик!",
+      low: "*Пошатываясь в угасающем пламени:* Мой свет остывает... Твоя мудрость разрывает мои небеса..."
+    },
+    charisma: {
+      high: "Перед моим величием меркнет любая смертная харизма!",
+      medium: "*Гневно сверкает глазами:* Твоя дерзкая харизма... заслоняет мой чистый свет!",
+      low: "*Уронив веер, плачет:* Твои праведные слова... вернули тьму в мою пещеру... Я гасну..."
+    },
+    willpower: {
+      high: "Твоя хрупкая воля сгорит дотла в моем небесном пламени!",
+      medium: "*Держится за сердце:* Твое превозмогание... начинает обжигать мою собственную ауру!",
+      low: "*Едва видимая в лучах заката:* Чистая искра твоего духа... победила вечный огонь..."
+    }
+  };
+
+  const specificJormungand: Record<string, Record<'high'|'medium'|'low', string>> = {
+    strength: {
+      high: "Твой разрушительный удар бессилен против преград Мирового Змея!",
+      medium: "*Шипит со злостью, сжимая кольца:* Твоя сталь рассекает чешую! Но я вечен!",
+      low: "*Истекая ядом, с хрустом падает:* Мировой круг порван... Кости ломаются... Твоя сила сокрушила вечность..."
+    },
+    intelligence: {
+      high: "Твои хитрые формулы не разорвут бесконечную цепь судьбы!",
+      medium: "*Яростно качает головой:* Твоя магия разума... путает мои вековые циклы!",
+      low: "*Угасающие глаза застилает туман:* Мой змеиный разум растворяется... Судьба побеждена твоей мудростью..."
+    },
+    charisma: {
+      high: "Ш-ш-ссс... Твое очарование не остановит неотвратимый яд забвения!",
+      medium: "*Трясет хвостом в гневе:* Ш-ш-ссс... Хватит вещать! Твои речи вызывают головную боль!",
+      low: "*Опускается в прах с тихим шепотом:* Мой ядовитый шепот стих... Твой суровый глас победил..."
+    },
+    willpower: {
+      high: "Твой дух крепок, но колесо времени все равно обратит тебя в прах!",
+      medium: "*Тяжело содрогается:* Твоя воля воистину сильна... Мои кольца дрожат!",
+      low: "*Теряя последние силы:* Цепь разорвана... Твоя стальная воля победила судьбу..."
+    }
+  };
+
+  const source = isLeviathan ? specificLeviathan : (isAmaterasu ? specificAmaterasu : (isJormungand ? specificJormungand : fallbackPools));
+  const group = source[stat] || fallbackPools[stat] || fallbackPools.strength;
+  return group[healthStage];
+};
+
 export default function App() {
   const [player, setPlayer] = useState<Player>(() => {
     const defaultPlayer: Player = { 
@@ -610,6 +841,17 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   const [newTaskDay, setNewTaskDay] = useState<number>(1);
   const [newTaskRepeatInterval, setNewTaskRepeatInterval] = useState<number>(2);
   const [bossHit, setBossHit] = useState(false);
+  const [bossBanterBubble, setBossBanterBubble] = useState<string | null>(null);
+  const [bossBubbleTimer, setBossBubbleTimer] = useState<any>(null);
+
+  const triggerBossBanterBubble = (text: string) => {
+    setBossBanterBubble(text);
+    if (bossBubbleTimer) clearTimeout(bossBubbleTimer);
+    const timer = setTimeout(() => {
+      setBossBanterBubble(null);
+    }, 6500);
+    setBossBubbleTimer(timer);
+  };
   const [lastDamageDealt, setLastDamageDealt] = useState(0);
   const [lastDamageColor, setLastDamageColor] = useState('#FF2A55');
   const [showVictory, setShowVictory] = useState(false);
@@ -1659,13 +1901,17 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
   const handleRequestBalanceTasks = async () => {
     if (!masterQuest) return;
+    const deficit = masterQuest.target - masterQuest.current;
+    const neededCount = Math.max(1, Math.ceil(deficit / 10));
     setIsGeneratingBalanceTasks(true);
     try {
       const generated = await generateMasterBalanceTasks(
         effectiveApiKey,
         effectiveAiBaseUrl,
         effectiveAiModel,
-        masterQuest.stat
+        masterQuest.stat,
+        neededCount,
+        tasks.map(t => t.text)
       );
       
       const newTasks: Task[] = generated.map(gt => ({
@@ -1680,8 +1926,21 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         isMasterTask: true
       }));
 
-      setTasks(prev => [...prev, ...newTasks]);
+      setTasks(prev => {
+        const existingLowerTextSet = new Set(prev.map(t => t.text.trim().toLowerCase()));
+        const uniqueNewTasks: Task[] = [];
+        for (const nt of newTasks) {
+          const trimmedLower = nt.text.trim().toLowerCase();
+          if (!existingLowerTextSet.has(trimmedLower)) {
+            uniqueNewTasks.push(nt);
+            existingLowerTextSet.add(trimmedLower);
+          }
+        }
+        return [...prev, ...uniqueNewTasks];
+      });
       setGmMessage(`Мастер: "Вот твои испытания для развития характеристики ${STATS[masterQuest.stat]?.name || masterQuest.stat}. Выполни их, чтобы восстановить пошатнувшийся баланс!"`);
+      import('./lib/sfx').then(({ playSound }) => playSound('powerup'));
+      setActiveTab('quests');
     } catch (error: any) {
       console.error("Failed to generate master balance tasks:", error);
       setApiError(error.message || "Ошибка при создании задач");
@@ -2171,6 +2430,19 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     });
     
     setGmMessage(`${player.familiar.name}: "*Гррр!* ${player.familiar.name} применяет боевой навык «${skill.name}» и ${skill.effectText} Нанесено ${damageDealt} ед. урона!"`);
+
+    // Let boss respond to pet's devastating blow
+    const companionSurvived = boss.hp - damageDealt > 0;
+    setTimeout(() => {
+      if (companionSurvived) {
+        const updatedBoss = { ...boss, hp: Math.max(0, boss.hp - damageDealt) };
+        const reactionLine = getBossBanterLine(updatedBoss, weaknessStat);
+        setGmMessage(`Босс: "${reactionLine}"`);
+        triggerBossBanterBubble(reactionLine);
+      } else {
+        triggerBossBanterBubble("*Издает сокрушительный предсмертный рык и рассыпается древним прахом...*");
+      }
+    }, 1200);
   };
 
   const handleAttack = () => {
@@ -2288,46 +2560,15 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       };
     });
 
+    const updatedBoss = { ...boss, hp: Math.max(0, boss.hp - damageDealt) };
+
     if (bossSurvived) {
-      if (boss.banter && boss.banter[maxStat]) {
-        setGmMessage(`Босс: "${boss.banter[maxStat]}"`);
-      } else {
-        const lowerName = boss.name.toLowerCase();
-        const fallbacks: Record<string, string[]> = {
-          "левиафан": [
-            "Р-р-рааа! Древние пучины поглотят твою дерзость!",
-            "Волны бьются о сталь... Твой удар — лишь капля в моем бесконечном море!",
-            "Вода вокруг закипает от твоей ярости, ничтожный смертный!"
-          ],
-          "аматерасу": [
-            "Глупец, ты пытаешься затмить свет самого небесного светила?!",
-            "Тьма сгущается вокруг тех, кто дерзает поднять руку на божество!",
-            "Мое великое сияние выжжет твою самоуверенность дотла!"
-          ],
-          "ёрмунганд": [
-            "Х-х-ссс! Великое кольцо времени сжимается, тебе не уйти!",
-            "Моя чешуя видела закаты целых миров, твои потуги жалки!",
-            "Сама земля содрогнется, когда рухнут твои иллюзии победы!"
-          ],
-          "фенрир": [
-            "Ау-у-у! Железные цепи трещат, моя великая ярость безгранична!",
-            "Твоя атака лишь раззадорила зверя внутри меня!",
-            "Мои клыки найдут твое сердце раньше, чем ты замахнешься вновь!"
-          ]
-        };
-        let matchKey = Object.keys(fallbacks).find(k => lowerName.includes(k));
-        const list = matchKey ? fallbacks[matchKey] : [
-          "Рх-х! Твой удар горяч, но моя броня крепка!",
-          "Ха! Это лишь раззадорило меня! Попробуй еще!",
-          "Ай! Эта царапина дорого тебе обойдется, ничтожный!",
-          "Твои атаки слишком слабы, чтобы сокрушить мою волю!",
-          "Ты бьешь изо всех сил... но это лишь забавляет меня!"
-        ];
-        const randomIndex = Math.floor(Math.random() * list.length);
-        setGmMessage(`Босс: "${list[randomIndex]}"`);
-      }
+      const bossLine = getBossBanterLine(updatedBoss, maxStat);
+      setGmMessage(`Босс: "${bossLine}"`);
+      triggerBossBanterBubble(bossLine);
     } else {
       setGmMessage(`Мастер: "Превосходно! Владыка ${boss.name} повержен твоей непоколебимой силой!"`);
+      triggerBossBanterBubble("*Издает сокрушительный предсмертный рык и рассыпается древним прахом...*");
     }
   };
 
@@ -2522,7 +2763,21 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
         setGenerationProgress(10);
         setGenerationStep('Создаем новые земли...');
-        const aiCampaign = await generateAICampaign(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.stats, newDefeated, gameState.currentStory, finalLevel, player.dailyPointsHistory, player.inventory, gameState.nemesisBoss || undefined, chronicleToPass);
+        const aiCampaign = await generateAICampaign(
+          effectiveApiKey, 
+          effectiveAiBaseUrl, 
+          effectiveAiModel, 
+          player.stats, 
+          newDefeated, 
+          gameState.currentStory, 
+          finalLevel, 
+          player.dailyPointsHistory, 
+          player.inventory, 
+          gameState.nemesisBoss || undefined, 
+          chronicleToPass, 
+          false, 
+          tasks.map(t => t.text)
+        );
         
         setGenerationProgress(30);
         setGenerationStep('Подготовка рынка...');
@@ -2588,18 +2843,21 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         if (aiCampaign.masterTask) {
           setTasks(prev => {
             const newTasks = prev.filter(t => !t.isMasterTask);
-            newTasks.push({
-              id: crypto.randomUUID(),
-              text: aiCampaign.masterTask.text,
-              stat: aiCampaign.masterTask.stat || 'strength',
-              type: 'weekly',
-              difficulty: aiCampaign.masterTask.difficulty || 4,
-              createdAt: Date.now(),
-              completed: false,
-              rewarded: false,
-              isMasterTask: true,
-              availableAt: Date.now()
-            });
+            const exists = newTasks.some(t => t.text.trim().toLowerCase() === aiCampaign.masterTask.text.trim().toLowerCase());
+            if (!exists) {
+              newTasks.push({
+                id: crypto.randomUUID(),
+                text: aiCampaign.masterTask.text,
+                stat: aiCampaign.masterTask.stat || 'strength',
+                type: 'weekly',
+                difficulty: aiCampaign.masterTask.difficulty || 4,
+                createdAt: Date.now(),
+                completed: false,
+                rewarded: false,
+                isMasterTask: true,
+                availableAt: Date.now()
+              });
+            }
             return newTasks;
           });
         }
@@ -2665,7 +2923,21 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       
       setGenerationProgress(10);
       setGenerationStep('Создаем новые земли...');
-      const aiCampaign = await generateAICampaign(effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.stats, gameState.defeatedBosses, gameState.currentStory, player.level, player.dailyPointsHistory, player.inventory, nemesisToUse, gameState.chronicle, isReroll);
+      const aiCampaign = await generateAICampaign(
+        effectiveApiKey, 
+        effectiveAiBaseUrl, 
+        effectiveAiModel, 
+        player.stats, 
+        gameState.defeatedBosses, 
+        gameState.currentStory, 
+        player.level, 
+        player.dailyPointsHistory, 
+        player.inventory, 
+        nemesisToUse, 
+        gameState.chronicle, 
+        isReroll,
+        tasks.map(t => t.text)
+      );
       
       setGenerationProgress(30);
       setGenerationStep('Подготовка рынка...');
@@ -2731,18 +3003,21 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       if (aiCampaign.masterTask) {
         setTasks(prev => {
           const newTasks = prev.filter(t => !t.isMasterTask);
-          newTasks.push({
-            id: crypto.randomUUID(),
-            text: aiCampaign.masterTask.text,
-            stat: aiCampaign.masterTask.stat || 'strength',
-            type: 'weekly',
-            difficulty: aiCampaign.masterTask.difficulty || 4,
-            createdAt: Date.now(),
-            completed: false,
-            rewarded: false,
-            isMasterTask: true,
-            availableAt: Date.now()
-          });
+          const exists = newTasks.some(t => t.text.trim().toLowerCase() === aiCampaign.masterTask.text.trim().toLowerCase());
+          if (!exists) {
+            newTasks.push({
+              id: crypto.randomUUID(),
+              text: aiCampaign.masterTask.text,
+              stat: aiCampaign.masterTask.stat || 'strength',
+              type: 'weekly',
+              difficulty: aiCampaign.masterTask.difficulty || 4,
+              createdAt: Date.now(),
+              completed: false,
+              rewarded: false,
+              isMasterTask: true,
+              availableAt: Date.now()
+            });
+          }
           return newTasks;
         });
       }
@@ -3297,7 +3572,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
               >
                 <div className="flex justify-between items-center mb-3">
                   <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-                    <Bot className="text-amber-400" />
+                    <Eye className="text-amber-400" />
                     Настройки ИИ Мастера
                   </h2>
                   <button onClick={() => setShowSettings(false)} className="text-slate-500 hover:text-slate-300">
@@ -3413,7 +3688,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                           disabled={isGeneratingBoss}
                           className="w-full py-2 bg-[#0B0E14] hover:bg-white/5 text-slate-300 text-xs rounded-lg transition-colors border border-white/5 flex items-center justify-center gap-2"
                         >
-                          {isGeneratingBoss ? <Loader2 size={14} className="animate-spin" /> : <Bot size={14} />}
+                          {isGeneratingBoss ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
                           Сгенерировать кампанию сейчас
                         </button>
 
@@ -3527,7 +3802,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                     ? 'bg-rose-500/20 border-rose-500/50 text-rose-400' 
                     : 'bg-amber-500/20 border-amber-500/50 text-amber-400'
                 }`}>
-                  {themeColor === 'rose' ? <Skull size={20} /> : <Bot size={20} />}
+                  {themeColor === 'rose' ? <Skull size={20} /> : <Eye size={20} />}
                 </div>
                 <div className="flex-1">
                   <h4 className={`text-xs font-bold uppercase tracking-wider mb-1 ${
@@ -3674,7 +3949,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                       className="flex-shrink-0 flex items-center justify-center w-8 h-8 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 border border-slate-500/30 rounded-full transition-colors cursor-pointer"
                       title="Авто-категоризация задач (ИИ)"
                     >
-                      {isCategorizingTasks ? <Loader2 size={12} className="animate-spin" /> : <Bot size={12} />}
+                      {isCategorizingTasks ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
                     </button>
                   )}
                 </div>
@@ -3705,12 +3980,16 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         key={`task-${task.id}`}
                         onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
                         className={`group flex items-center gap-3 p-4 transition-all glass-card cursor-pointer shadow-md ${
-                          task.isMasterTask ? '!border-orange-500/80 shadow-[0_0_15px_rgba(249,115,22,0.2)] bg-amber-500/5' : ''
-                        } ${
                           task.completed
                             ? 'opacity-50 grayscale pt-3 pb-3'
                             : 'hover:border-white/10'
                         }`}
+                        style={task.isMasterTask ? { 
+                          borderColor: STATS[task.stat]?.hex || '#F59E0B', 
+                          boxShadow: `0 0 15px ${(STATS[task.stat]?.hex || '#F59E0B')}22`,
+                          backgroundColor: `${STATS[task.stat]?.hex || '#F59E0B'}05`,
+                          borderWidth: '1.5px'
+                        } : undefined}
                       >
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleTask(task.id); }}
@@ -3808,7 +4087,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 }}
                                 className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors flex items-center gap-1"
                               >
-                                <Bot size={10} />
+                                <Eye size={10} />
                                 Разбить
                               </button>
                             )}
@@ -3934,7 +4213,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
                     <div className="relative w-20 h-20 mx-auto mb-4 flex items-center justify-center rounded-2xl bg-[#0B0E14] border-2 border-white/5 shadow-inner">
                       <div className="absolute inset-0 rounded-2xl opacity-10 blur-[8px] animate-pulse" style={{ backgroundColor: STATS[masterQuest.stat]?.hex }} />
-                      <Bot size={40} className="text-amber-500 relative z-10" />
+                      <Eye size={40} className="text-amber-500 relative z-10" />
                     </div>
 
                     <h2 className="text-xl font-black text-slate-100 uppercase tracking-wider mb-1">
@@ -4013,7 +4292,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                               </>
                             ) : (
                               <>
-                                <Bot size={16} className="text-slate-950" />
+                                <Eye size={16} className="text-slate-950" />
                                 <span>Запросить задачи Мастера</span>
                               </>
                             )}
@@ -4274,7 +4553,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                     }}
                                     className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/30 rounded-xl text-xs font-semibold transition-all shadow-lg hover:shadow-purple-500/10 cursor-pointer flex items-center gap-1.5 active:scale-95 z-20"
                                   >
-                                    <Bot size={13} />
+                                    <Eye size={13} />
                                     Призвать облик
                                   </button>
                                 )}
@@ -4295,7 +4574,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                     }}
                                     className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/30 rounded-xl text-xs font-semibold transition-all shadow-lg hover:shadow-purple-500/10 cursor-pointer flex items-center gap-1.5 active:scale-95 z-20"
                                   >
-                                    <Bot size={13} />
+                                    <Eye size={13} />
                                     Призвать облик
                                   </button>
                                 )}
@@ -4314,6 +4593,25 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 style={{ color: lastDamageColor, textShadow: `0 0 20px ${lastDamageColor}` }}
                               >
                                 -{lastDamageDealt}
+                              </motion.div>
+                            )}
+
+                            {bossBanterBubble && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: -40 }}
+                                className="absolute z-40 max-w-[85%] bg-black/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-amber-500/50 shadow-[0_10px_30px_rgba(245,158,11,0.25)] text-center flex flex-col items-center gap-1.5 overflow-hidden"
+                                transition={{ duration: 0.25 }}
+                              >
+                                {/* Speak Pointer */}
+                                <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-black border-r border-b border-amber-500/50 rotate-45" />
+                                
+                                <span className="text-[9px] font-black uppercase text-amber-400 tracking-[0.2em] mb-[-4px]">
+                                  {boss.name}
+                                </span>
+                                <p className="text-xs font-semibold text-slate-100 leading-relaxed font-sans max-h-[140px] overflow-y-auto pr-1">
+                                  {bossBanterBubble}
+                                </p>
                               </motion.div>
                             )}
                           </motion.div>
