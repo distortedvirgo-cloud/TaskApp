@@ -944,7 +944,14 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         },
         recent_memory_log: [],
         master_summary: "Мастер пока присматривается к вам. Выполняйте задачи, чтобы он смог оценить ваши сильные и слабые стороны."
-      } as HeroChronicle
+      } as HeroChronicle,
+      weeklyCompletedCounts: {
+        strength: 0,
+        intelligence: 0,
+        charisma: 0,
+        willpower: 0,
+        unknown: 0
+      } as Record<StatType, number>
     };
     try {
       const saved = localStorage.getItem('questlog_game_state');
@@ -953,6 +960,9 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         // Ensure chronicle exists in parsed state
         if (!parsed.chronicle) {
           parsed.chronicle = defaultState.chronicle;
+        }
+        if (!parsed.weeklyCompletedCounts) {
+          parsed.weeklyCompletedCounts = defaultState.weeklyCompletedCounts;
         }
         if (parsed.events && Array.isArray(parsed.events)) {
           parsed.events = parsed.events.filter((item: any, index: number, self: any[]) => index === self.findIndex((t) => t.id === item.id));
@@ -1063,26 +1073,26 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     if (boss && boss.id && boss.id === masterQuestBossId) return;
     if (campaign && campaign.id && masterQuestCampaignId === campaign.id) return;
 
-    const statsToCheck: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
-    const levels = statsToCheck.map(s => player.stats[s]?.level || 1);
-    const maxLevel = Math.max(...levels);
-    const minLevel = Math.min(...levels);
+    let threshold = 1;
+    if (player.level >= 50) {
+      threshold = 3;
+    } else if (player.level >= 25) {
+      threshold = 2;
+    }
 
-    if (maxLevel - minLevel >= 2) {
-      const minIndices: number[] = [];
-      levels.forEach((lvl, idx) => {
-        if (lvl === minLevel) {
-          minIndices.push(idx);
-        }
-      });
-      
-      let eligibleIndices = minIndices.filter(idx => statsToCheck[idx] !== lastMasterQuestStat);
-      if (eligibleIndices.length === 0) {
-        eligibleIndices = minIndices;
+    const statsToCheck: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
+    const counts = gameState.weeklyCompletedCounts || { strength: 0, intelligence: 0, charisma: 0, willpower: 0, unknown: 0 };
+    const neglectedStats = statsToCheck.filter(s => (counts[s] || 0) < threshold);
+
+    if (neglectedStats.length > 0) {
+      let eligible = neglectedStats.filter(s => s !== lastMasterQuestStat);
+      if (eligible.length === 0) {
+        eligible = neglectedStats;
       }
       
-      const neglectedIndex = eligibleIndices[Math.floor(Math.random() * eligibleIndices.length)];
-      const stat = statsToCheck[neglectedIndex];
+      const minCount = Math.min(...eligible.map(s => counts[s] || 0));
+      const worstStats = eligible.filter(s => (counts[s] || 0) === minCount);
+      const stat = worstStats[Math.floor(Math.random() * worstStats.length)];
 
       const newQuest: MasterQuest = {
         stat,
@@ -1097,9 +1107,9 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       if (campaign && campaign.id) {
         setMasterQuestCampaignId(campaign.id);
       }
-      setGmMessage(`Мастер: "Твоя тренировка несбалансирована! Ты сильно пренебрегаешь характеристикой ${STATS[stat]?.name || stat}. Я заблокировал логово босса. Выполни мои указания и восстанови баланс!"`);
+      setGmMessage(`Мастер: "На этой неделе ты выполнил недостаточно задач характеристики ${STATS[stat]?.name || stat} (выполнено: ${counts[stat] || 0}, требуется: ${threshold}). Логово босса заблокировано, пока ты не восстановишь баланс!"`);
     }
-  }, [activeTab, player.stats, masterQuest, boss, masterQuestBossId, lastMasterQuestStat, campaign, masterQuestCampaignId]);
+  }, [activeTab, player.level, gameState.weeklyCompletedCounts, masterQuest, boss, masterQuestBossId, lastMasterQuestStat, campaign, masterQuestCampaignId]);
 
   const processingEncounterRef = useRef(false);
   const preGeneratingChronicleRef = useRef(false);
@@ -1484,7 +1494,14 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       if (currentMonday.getTime() > lastWeeklyMonday.getTime()) {
         setGameState(prev => ({
           ...prev,
-          lastWeeklyReset: now.getTime()
+          lastWeeklyReset: now.getTime(),
+          weeklyCompletedCounts: {
+            strength: 0,
+            intelligence: 0,
+            charisma: 0,
+            willpower: 0,
+            unknown: 0
+          }
         }));
       }
 
@@ -1742,6 +1759,15 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   }, [boss, campaign, isGeneratingBoss, bossFailed]);
 
   const gainRewards = (xpAmount: number, damageAmount: number, stat: StatType, statXpAmount: number, isDaily: boolean, goldAmount: number = 0) => {
+    setGameState(prev => {
+      const counts = { ...(prev.weeklyCompletedCounts || { strength: 0, intelligence: 0, charisma: 0, willpower: 0, unknown: 0 }) };
+      counts[stat] = (counts[stat] || 0) + 1;
+      return {
+        ...prev,
+        weeklyCompletedCounts: counts
+      };
+    });
+
     setPlayer(prev => {
       let xpMultiplier = 1;
       let statXpMultiplier = 1;
@@ -4219,15 +4245,23 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                     <h2 className="text-xl font-black text-slate-100 uppercase tracking-wider mb-1">
                       Испытание Мастера
                     </h2>
-                    <span 
-                      className="text-xs font-bold uppercase tracking-[0.16em] py-1 px-3.5 rounded-full bg-white/5 border border-white/10"
-                      style={{ color: STATS[masterQuest.stat]?.hex }}
-                    >
-                      Пренебрежение: {STATS[masterQuest.stat]?.name}
-                    </span>
+                    <div className="flex flex-wrap items-center justify-center gap-2 mt-1 mb-2">
+                      <span 
+                        className="text-xs font-bold uppercase tracking-[0.16em] py-1 px-3.5 rounded-full bg-white/5 border border-white/10"
+                        style={{ color: STATS[masterQuest.stat]?.hex }}
+                      >
+                        Пренебрежение: {STATS[masterQuest.stat]?.name}
+                      </span>
+                      {timeLeft && (
+                        <span className="text-[11px] font-bold uppercase text-rose-400 bg-rose-500/10 border border-rose-500/20 py-1 px-3 rounded-full flex items-center gap-1.5 shadow-[0_0_10px_rgba(244,63,94,0.1)]">
+                          <Clock size={12} className="animate-pulse" />
+                          Осталось: {timeLeft}
+                        </span>
+                      )}
+                    </div>
 
                     <p className="text-sm text-slate-400 mt-4 leading-relaxed max-w-xs mx-auto text-center font-sans">
-                      Мастер заблокировал логово босса! Твоя подготовка несбалансирована — ты забросил тренировку характеристики <span className="font-bold text-slate-200">{STATS[masterQuest.stat]?.name}</span>.
+                      Мастер заблокировал логово босса! На этой неделе ты выполнил недостаточно задач характеристики <span className="font-bold text-slate-200">{STATS[masterQuest.stat]?.name}</span>. Было сделано всего <span className="font-bold text-slate-200">{gameState.weeklyCompletedCounts?.[masterQuest.stat] || 0}</span> из необходимых <span className="font-bold text-slate-200">{player.level >= 50 ? 3 : (player.level >= 25 ? 2 : 1)}</span> задач.
                     </p>
 
                     <div className="mt-6 p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10 text-left space-y-3 relative overflow-hidden">
