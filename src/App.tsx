@@ -1024,6 +1024,20 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     safeStorageSet('questlog_show_chronicle_victory_modal', showChronicleVictoryModal ? 'true' : 'false');
   }, [showChronicleVictoryModal]);
 
+  const [lastClosedChronicleBossId, setLastClosedChronicleBossId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('questlog_last_closed_chronicle_boss_id');
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    if (lastClosedChronicleBossId) {
+      safeStorageSet('questlog_last_closed_chronicle_boss_id', lastClosedChronicleBossId);
+    } else {
+      try { localStorage.removeItem('questlog_last_closed_chronicle_boss_id'); } catch {}
+    }
+  }, [lastClosedChronicleBossId]);
+
   const [isGeneratingBalanceTasks, setIsGeneratingBalanceTasks] = useState(false);
 
   useEffect(() => {
@@ -1625,6 +1639,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     if (!campaign || !boss || !boss.id) return;
     const isCampaignFinished = campaign.currentEnemyIndex >= campaign.enemies.length - 1;
     if (!isCampaignFinished) return;
+    if (lastClosedChronicleBossId === boss.id) return;
 
     // If there is an existing chronicle but it doesn't match the current boss name, reset it
     if (chronicleVictory && !chronicleVictory.title.includes(boss.name)) {
@@ -1690,7 +1705,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     return () => {
       isMounted = false;
     };
-  }, [boss?.id, campaign?.id, campaign?.currentEnemyIndex, effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.playerClass, player.stats, chronicleVictory]);
+  }, [boss?.id, campaign?.id, campaign?.currentEnemyIndex, effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.playerClass, player.stats, chronicleVictory, lastClosedChronicleBossId]);
 
   useEffect(() => {
     if (campaign) {
@@ -3394,6 +3409,9 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                 <div className="pt-6 text-center">
                   <button
                     onClick={() => {
+                      if (boss?.id) {
+                        setLastClosedChronicleBossId(boss.id);
+                      }
                       setShowChronicleVictoryModal(false);
                       setChronicleVictory(null);
                       preGeneratingChronicleRef.current = false;
