@@ -4426,27 +4426,27 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                   {campaign ? (
                     <div className="w-full mb-2">
                         {gameState.chronicle.season_info && (
-                          <div className="w-full text-center mb-3 mt-1 relative z-10 px-2">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 shadow-lg">
+                          <div className="w-full text-center mb-2 mt-0.5 relative z-10 px-2 scale-90 origin-center">
+                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 bg-black/40 backdrop-blur-md px-3.5 py-1 rounded-full border border-white/10 shadow-md">
                               {gameState.chronicle.season_info.name} <span className="opacity-50 ml-1">[{gameState.chronicle.season_info.current_campaign}/{gameState.chronicle.season_info.total_campaigns}]</span>
                             </span>
                           </div>
                         )}
-                      <div className="flex justify-between items-center mb-3 px-1">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-1.5 rounded-[12px] bg-[#12141A] border-2 ${THEME_COLORS[campaign.colorTheme || 'slate'].border} ${THEME_COLORS[campaign.colorTheme || 'slate'].text} ${THEME_COLORS[campaign.colorTheme || 'slate'].dropShadow} shadow-lg relative overflow-hidden`}>
+                      <div className="flex justify-between items-center mb-2 px-1 font-sans">
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1 rounded-[10px] bg-[#12141A] border-[1.5px] ${THEME_COLORS[campaign.colorTheme || 'slate'].border} ${THEME_COLORS[campaign.colorTheme || 'slate'].text} ${THEME_COLORS[campaign.colorTheme || 'slate'].dropShadow} shadow-md relative overflow-hidden`}>
                              <div className={`absolute inset-0 opacity-20 ${THEME_COLORS[campaign.colorTheme || 'slate'].bg}`} />
-                             <Skull size={18} className="relative z-10" />
+                             <Skull size={14} className="relative z-10" />
                           </div>
-                          <h2 className={`text-[16px] font-black tracking-wide ${THEME_COLORS[campaign.colorTheme || 'slate'].text} drop-shadow-md`}>{campaign.theme}</h2>
+                          <h2 className={`text-[13px] font-black tracking-wide ${THEME_COLORS[campaign.colorTheme || 'slate'].text} drop-shadow-md`}>{campaign.theme}</h2>
                         </div>
-                        <div className={`flex items-center gap-1.5 glass-card px-2.5 py-1 !rounded-xl border border-white/5 text-slate-300 shadow-md`}>
-                          <Clock size={12} className={THEME_COLORS[campaign.colorTheme || 'slate'].text} />
-                          <span className="font-mono text-[10px] font-bold">{timeLeft}</span>
+                        <div className={`flex items-center gap-1 glass-card px-2 py-0.5 !rounded-lg border border-white/5 text-slate-300 shadow-md`}>
+                          <Clock size={10} className={THEME_COLORS[campaign.colorTheme || 'slate'].text} />
+                          <span className="font-mono text-[8.5px] font-bold">{timeLeft}</span>
                         </div>
                       </div>
                       
-                      <div className={`relative w-full h-[76px] bg-[#0B0E14] rounded-[20px] border border-white/10 ${THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent} overflow-hidden shadow-sm`}>
+                      <div className={`relative w-full h-[60px] bg-[#0B0E14] rounded-[16px] border border-white/10 ${THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent} overflow-hidden shadow-sm`}>
                         {campaign.mapUrl ? (
                           <img src={campaign.mapUrl} alt="Campaign Map" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-luminosity" referrerPolicy="no-referrer" />
                         ) : (
@@ -4454,7 +4454,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         )}
                         <div className={`absolute inset-0 bg-gradient-to-r from-[#0B0E14]/80 via-transparent to-[#0B0E14]/80`} />
                         
-                        <div className="absolute inset-0 flex items-center justify-around px-5">
+                        <div className="absolute inset-0 flex items-center justify-around px-4 font-sans">
                           {campaign.enemies.map((enemy, idx) => {
                             const isCurrent = idx === campaign.currentEnemyIndex;
                             const isDefeated = idx < campaign.currentEnemyIndex;
@@ -4463,38 +4463,38 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                               <div key={`${enemy.id}-${idx}`} className="relative flex flex-col items-center">
                                 {/* Path line */}
                                 {idx < campaign.enemies.length - 1 && (
-                                  <div className={`absolute top-4 left-1/2 w-full h-0.5 -z-10 ${isDefeated ? THEME_COLORS[campaign.colorTheme || 'slate'].bg : 'bg-white/10'}`} style={{ width: 'calc(100% + 2.5rem)', opacity: isDefeated ? 0.5 : 1 }} />
+                                  <div className={`absolute top-[14px] left-1/2 w-full h-0.5 -z-10 ${isDefeated ? THEME_COLORS[campaign.colorTheme || 'slate'].bg : 'bg-white/10'}`} style={{ width: 'calc(100% + 2rem)', opacity: isDefeated ? 0.5 : 1 }} />
                                 )}
                                 
                                 <div 
                                   onClick={() => handleEnemyClick(enemy, idx)}
-                                  className={`w-[36px] h-[36px] rounded-full border-2 flex items-center justify-center bg-[#0B0E14] z-10 transition-all cursor-pointer ${
-                                  isCurrent ? `border-transparent scale-110 ${THEME_COLORS[campaign.colorTheme || 'slate'].shadow}` : 
+                                  className={`w-[28px] h-[28px] rounded-full border-[1.5px] flex items-center justify-center bg-[#0B0E14] z-10 transition-all cursor-pointer ${
+                                  isCurrent ? `border-transparent scale-105 ${THEME_COLORS[campaign.colorTheme || 'slate'].shadow}` : 
                                   isDefeated ? 'border-transparent opacity-80 backdrop-blur-sm' : 'border-white/10 opacity-70'
                                 }`}
                                   style={isCurrent ? { borderColor: 'currentColor', color: 'var(--tw-colors-amber-400)' } : {}}
                                 >
-                                  {isCurrent && <div className={`absolute inset-0 rounded-full border-[3px] ${THEME_COLORS[campaign.colorTheme || 'slate'].border} animate-pulse`} />}
-                                  {isDefeated && <div className={`absolute inset-0 rounded-full border-2 ${THEME_COLORS[campaign.colorTheme || 'slate'].border} opacity-50`} />}
+                                  {isCurrent && <div className={`absolute inset-0 rounded-full border-2 ${THEME_COLORS[campaign.colorTheme || 'slate'].border} animate-pulse`} />}
+                                  {isDefeated && <div className={`absolute inset-0 rounded-full border-[1.5px] ${THEME_COLORS[campaign.colorTheme || 'slate'].border} opacity-50`} />}
                                   
                                   <div className="w-full h-full overflow-hidden rounded-full relative">
                                     <div className="absolute inset-0 bg-[#0B0E14] opacity-50" />
                                     {enemy.imageUrl && !(idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex) ? (
                                       <img src={enemy.imageUrl} alt={enemy.name} className={`w-full h-full object-cover relative z-10 ${isDefeated ? 'grayscale' : ''}`} referrerPolicy="no-referrer" />
                                     ) : enemy.avatarEmoji && !(idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex) ? (
-                                      <span className="text-lg z-10 relative">{enemy.avatarEmoji}</span>
+                                      <span className="text-xs z-10 relative">{enemy.avatarEmoji}</span>
                                     ) : (
-                                      <Skull size={16} className={`relative z-10 ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : isDefeated ? 'text-slate-600' : 'text-slate-600'}`} />
+                                      <Skull size={12} className={`relative z-10 ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : isDefeated ? 'text-slate-600' : 'text-slate-600'}`} />
                                     )}
                                   </div>
                                   
                                   {isDefeated && (
-                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#0B0E14] rounded-full flex items-center justify-center z-20 border border-white/10">
-                                      <CheckCircle size={10} className={THEME_COLORS[campaign.colorTheme || 'slate'].text} />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#0B0E14] rounded-full flex items-center justify-center z-20 border border-white/10">
+                                      <CheckCircle size={8} className={THEME_COLORS[campaign.colorTheme || 'slate'].text} />
                                     </div>
                                   )}
                                 </div>
-                                <span className={`text-[8.5px] mt-1 font-bold w-[70px] text-center break-words leading-tight ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-slate-500'}`}>
+                                <span className={`text-[7px] mt-0.5 font-bold w-[56px] text-center truncate break-words leading-tight ${isCurrent ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-slate-500'}`}>
                                   {idx === campaign.enemies.length - 1 && idx > campaign.currentEnemyIndex ? '???' : enemy.name}
                                 </span>
                               </div>
@@ -4504,11 +4504,11 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                       </div>
                     </div>
                   ) : (
-                    <div className="w-full flex justify-between items-end mb-2 px-1">
-                      <h2 className="text-base font-bold text-slate-400">Одиночная цель</h2>
-                      <div className="flex items-center gap-1.5 text-slate-400 glass-card px-2.5 py-1 !rounded-lg">
-                        <Clock size={12} className="text-slate-400" />
-                        <span className="font-mono text-[10px] font-medium">{timeLeft}</span>
+                    <div className="w-full flex justify-between items-end mb-1.5 px-1 font-sans">
+                      <h2 className="text-xs font-bold text-slate-400">Одиночная цель</h2>
+                      <div className="flex items-center gap-1 text-slate-400 glass-card px-2 py-0.5 !rounded-lg">
+                        <Clock size={10} className="text-slate-400" />
+                        <span className="font-mono text-[8.5px] font-medium">{timeLeft}</span>
                       </div>
                     </div>
                   )}
@@ -4599,7 +4599,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                   );
                                 } else if (isGeneratingBossImage) {
                                   return (
-                                    <div className="flex flex-col items-center justify-center gap-4 text-white/30 animate-pulse mt-4">
+                                    <div className="flex flex-col items-center justify-center gap-4 text-white/30 animate-pulse mt-4 relative z-30 -translate-y-8">
                                       <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center">
                                          <div className="w-12 h-12 rounded-full border border-white/5 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
                                             <div className={`w-2 h-2 rounded-full ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'bg-slate-500'} shadow-[0_0_10px_currentColor]`} />
@@ -4610,7 +4610,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                   );
                                 } else {
                                   return (
-                                    <div className="flex flex-col items-center justify-center gap-4 mt-4 text-white/50 relative z-10">
+                                    <div className="flex flex-col items-center justify-center gap-4 mt-4 text-white/50 relative z-30 -translate-y-8">
                                       <div className="w-16 h-16 rounded-full border border-red-500/30 flex items-center justify-center bg-red-500/10">
                                         <RefreshCw size={24} className="text-red-400" />
                                       </div>
@@ -4632,7 +4632,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 }
                               })()
                             ) : boss.avatarEmoji ? (
-                              <div className="flex flex-col items-center justify-center gap-4 relative z-10">
+                              <div className="flex flex-col items-center justify-center gap-4 relative z-30 -translate-y-8">
                                 <span className="text-8xl drop-shadow-2xl">{boss.avatarEmoji}</span>
                                 {(aiSettings.enableImages !== false) && (
                                   <button
@@ -4653,7 +4653,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                                 )}
                               </div>
                             ) : (
-                              <div className="flex flex-col items-center justify-center gap-4 relative z-10">
+                              <div className="flex flex-col items-center justify-center gap-4 relative z-30 -translate-y-8">
                                 <Skull size={80} className="text-slate-500 animate-pulse" />
                                 {(aiSettings.enableImages !== false) && (
                                   <button
@@ -4753,13 +4753,13 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         </motion.div>
 
                         {/* Attack Section */}
-                        <div className={`mt-auto space-y-3 shrink-0 glass-card rounded-[16px] p-4 border-2 ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].border : 'border-white/5'} ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent : ''}`}>
-                          <div className="flex items-center justify-between px-2">
-                            <span className="text-[13px] text-slate-400 flex items-center gap-2 font-medium tracking-wide">
-                              <Flame size={14} className={campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-amber-500'} />
+                        <div className={`mt-auto space-y-2 shrink-0 glass-card rounded-[14px] p-3 border-[1.5px] ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].border : 'border-white/5'} ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent : ''} font-sans`}>
+                          <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] text-slate-400 flex items-center gap-1.5 font-medium tracking-wide">
+                              <Flame size={12} className={campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].text : 'text-amber-500'} />
                               Накоплено силы:
                             </span>
-                            <span className="text-white font-black text-xl drop-shadow-md">
+                            <span className="text-white font-black text-base drop-shadow-md">
                               {(Object.values(player.pendingDamage) as number[]).reduce((a, b) => a + b, 0)}
                             </span>
                           </div>
@@ -4769,16 +4769,16 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                               <button
                                 onClick={handleBossDefeated}
                                 disabled={isGeneratingBoss}
-                                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#0B0E14] disabled:text-slate-600 disabled:border disabled:border-white/5 text-white font-bold rounded-[14px] shadow-[0_4px_15px_rgba(16,185,129,0.2)] disabled:shadow-none transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
+                                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-[#0B0E14] disabled:text-slate-600 disabled:border disabled:border-white/5 text-white font-bold rounded-[11px] shadow-[0_4px_15px_rgba(16,185,129,0.2)] disabled:shadow-none transition-all active:scale-95 flex items-center justify-center gap-1.5 text-xs"
                               >
                                 {isGeneratingBoss ? (
                                   <>
-                                    <Loader2 size={16} className="animate-spin" />
+                                    <Loader2 size={14} className="animate-spin" />
                                     Генерация...
                                   </>
                                 ) : (
                                   <>
-                                    <Trophy size={16} />
+                                    <Trophy size={14} />
                                     Продолжить
                                   </>
                                 )}
@@ -4816,39 +4816,39 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                         const boxShadow = totalPending > 0 ? `0 0 ${20 + glowIntensity * 30}px rgba(225,29,72,${0.2 + glowIntensity * 0.5})` : 'none';
 
                         return (
-                          <div className="pt-1 space-y-2">
+                          <div className="pt-0.5 space-y-1.5">
                             <button
                               onClick={handleAttack}
                               disabled={totalPending === 0}
                               style={{ ...gradientStyle, boxShadow }}
-                              className={`w-full py-2.5 ${totalPending === 0 ? 'bg-[#12141A] text-[#8A8D93] border border-white/5 shadow-inner' : 'text-white border-2 border-white/20 animate-gradient-flow cursor-pointer'} font-extrabold rounded-[14px] transition-all active:scale-95 flex items-center justify-center gap-2 relative overflow-hidden text-sm uppercase tracking-wider`}
+                              className={`w-full py-2 ${totalPending === 0 ? 'bg-[#12141A] text-[#8A8D93] border border-white/5 shadow-inner' : 'text-white border-2 border-white/20 animate-gradient-flow cursor-pointer'} font-extrabold rounded-[11px] transition-all active:scale-95 flex items-center justify-center gap-1.5 relative overflow-hidden text-xs uppercase tracking-wider`}
                             >
                               {totalPending > 0 && (
                                 <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
                               )}
-                              <Sword size={16} className="relative z-10" />
+                              <Sword size={13} className="relative z-10" />
                               <span className="relative z-10">Нанести удар</span>
                             </button>
 
                             {player.familiar && player.familiar.stage !== 'egg' && player.familiar.status === 'active' && (
-                              <div className="mt-2 text-left">
+                              <div className="mt-1.5 text-left">
                                 {familiarSkillUsed ? (
-                                  <div className="w-full py-2.5 bg-slate-950/40 border border-white/5 text-slate-500 font-bold rounded-[14px] text-[10px] uppercase tracking-wider text-center select-none">
+                                  <div className="w-full py-2 bg-slate-950/40 border border-white/5 text-slate-500 font-bold rounded-[11px] text-[9px] uppercase tracking-wider text-center select-none">
                                     ⚔ Боевой навык перезаряжается...
                                   </div>
                                 ) : (
                                   <button
                                     onClick={handleFamiliarSkill}
-                                    className="w-full py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-[14px] border border-blue-400/30 shadow-[0_0_15px_rgba(37,99,235,0.35)] transition-all active:scale-95 flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider relative overflow-hidden cursor-pointer"
+                                    className="w-full py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-[11px] border border-blue-400/30 shadow-[0_0_15px_rgba(37,99,235,0.35)] transition-all active:scale-95 flex items-center justify-center gap-1.5 text-[9px] uppercase tracking-wider relative overflow-hidden cursor-pointer"
                                   >
                                     <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
-                                    <Zap size={14} className="text-amber-300 animate-pulse shrink-0" />
+                                    <Zap size={12} className="text-amber-300 animate-pulse shrink-0" />
                                     <span className="truncate">
                                       {player.familiar.name}: {FAMILIAR_SKILLS[player.familiar.type]?.name || 'Удар Спутника'} (+{getFamiliarSkillDamage(player.familiar, player.combo)} ур.)
                                     </span>
                                   </button>
                                 )}
-                                <p className="text-[8px] text-slate-400 text-center mt-1.5 leading-snug">
+                                <p className="text-[7.5px] text-slate-400 text-center mt-1 leading-snug">
                                   {FAMILIAR_SKILLS[player.familiar.type]?.description || 'Наносит сокрушительный урон по слабости босса.'} <br/>
                                   <span className="text-emerald-400 font-semibold">(Выполнение ваших реальных дел перезаряжает навык!)</span>
                                 </p>
