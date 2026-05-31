@@ -608,11 +608,11 @@ const getBossBanterLine = (boss: Boss, stat: StatType): string => {
     if (currentBanter[stat] && typeof currentBanter[stat] === 'string') {
       const baseLine = currentBanter[stat];
       if (healthStage === 'low') {
-        return `*Тяжело дыша и истекая кровью:* "${baseLine}"`;
+        return `Тяжело дыша и истекая кровью: "${baseLine}"`;
       } else if (healthStage === 'medium') {
-        return `*Морщась от боли:* "${baseLine}"`;
+        return `Морщась от боли: "${baseLine}"`;
       } else {
-        return `*Свысока и властно:* "${baseLine}"`;
+        return `Свысока и властно: "${baseLine}"`;
       }
     }
   }
@@ -626,92 +626,92 @@ const getBossBanterLine = (boss: Boss, stat: StatType): string => {
   const fallbackPools: Record<string, Record<'high'|'medium'|'low', string>> = {
     strength: {
       high: "Ха-ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
-      medium: "*Стиснув зубы от удара:* Твои мускулы крепче, чем казалось... Но этого мало!",
-      low: "*Падая на колено и тяжело дыша:* Этот удар... сокрушает мои кости... Но я еще не повержен!"
+      medium: "Стиснув зубы от удара: Твои мускулы крепче, чем казалось... Но этого мало!",
+      low: "Падая на колено и тяжело дыша: Этот удар... сокрушает мои кости... Но я еще не повержен!"
     },
     intelligence: {
       high: "Твои заумные мысли и фокусы разума рассыпаются при столкновении со мной!",
-      medium: "*Хмурясь, рассеивает заклятие:* Твоё плетение пробивает мою ментальную защиту... Жалкий червь!",
-      low: "*Стеклянными глазами, вцепившись в голову:* Мои мысли гаснут... эти чары... они разрывают мой разум!"
+      medium: "Хмурясь, рассеивает заклятие: Твоё плетение пробивает мою ментальную защиту... Жалкий червь!",
+      low: "Стеклянными глазами, вцепившись в голову: Мои мысли гаснут... эти чары... они разрывают мой разум!"
     },
     charisma: {
       high: "Ты мнишь себя красноречивым лидером? Твои слова бессильны против моего величия!",
-      medium: "*Старается не слушать ваш голос:* Замолчи! Твои речи вселяют сомнение в моё сердце...",
-      low: "*Затыкает уши, дрожа от раскаяния:* Хватит... Твой голос... твоё величие ослепляет меня!"
+      medium: "Старается не слушать ваш голос: Замолчи! Твои речи вселяют сомнение в моё сердце...",
+      low: "Затыкает уши, дрожа от раскаяния: Хватит... Твой голос... твоё величие ослепляет меня!"
     },
     willpower: {
       high: "Ты закаляешь свой дух, но моя воля монолитна и не дрогнет!",
-      medium: "*Слегка покачнувшись:* Твой стальной дух... начинает подавлять мою ауру!",
-      low: "*Едва удерживая баланс, теряя волю за волей:* Моё превосходительство... рушится... Твоя чистая воля сильнее!"
+      medium: "Слегка покачнувшись: Твой стальной дух... начинает подавлять мою ауру!",
+      low: "Едва удерживая баланс, теряя волю за волей: Моё превосходительство... рушится... Твоя чистая воля сильнее!"
     }
   };
 
   const specificLeviathan: Record<string, Record<'high'|'medium'|'low', string>> = {
     strength: {
       high: "Глупец! Твоя сталь лишь царапает мою вековую океанскую защиту!",
-      medium: "*Морщится, когда вода вскипает:* Ты крепче, чем кажешься... Мои волны вздымаются!",
-      low: "*Истекая соленой кровью, падает на дно:* Невероятно... Океан... замерзает... Твоя сила сломила меня!"
+      medium: "Морщится, когда вода вскипает: Ты крепче, чем кажешься... Мои волны вздымаются!",
+      low: "Истекая соленой кровью, падает на дно: Невероятно... Океан... замерзает... Твоя сила сломила меня!"
     },
     intelligence: {
       high: "Твои плетения разума рассеиваются в бесконечном течении пучины!",
-      medium: "*Воет от боли разума:* Твои мантры проникают сквозь бездну! Это жалко ранит меня!",
-      low: "*Тяжело вздыхая, теряя рассудок:* Великая бездна гаснет... Твои чары... высушили мои глубины..."
+      medium: "Воет от боли разума: Твои мантры проникают сквозь бездну! Это жалко ранит меня!",
+      low: "Тяжело вздыхая, теряя рассудок: Великая бездна гаснет... Твои чары... высушили мои глубины..."
     },
     charisma: {
       high: "Твои сладкие речи заглушаются ревом прилива. Море безмолвно!",
-      medium: "*Разъяренно шипит:* Твой голос будоражит мои глубины! Замолчи, смертный!",
-      low: "*Склонив тяжелую голову:* Довольно... Твой праведный укор... заставляет меня уйти во мрак..."
+      medium: "Разъяренно шипит: Твой голос будоражит мои глубины! Замолчи, смертный!",
+      low: "Склонив тяжелую голову: Довольно... Твой праведный укор... заставляет меня уйти во мрак..."
     },
     willpower: {
       high: "Твое превозмогание — лишь мелкая волна перед моим вечным давлением!",
-      medium: "*Пошатываясь среди волн:* Твоя стальная воля... начинает вызывать бурю во мне!",
-      low: "*Едва дыша среди пены:* Твоя непобедимая воля... иссушила море... Конец близок..."
+      medium: "Пошатываясь среди волн: Твоя стальная воля... начинает вызывать бурю во мне!",
+      low: "Едва дыша среди пены: Твоя непобедимая воля... иссушила море... Конец близок..."
     }
   };
 
   const specificAmaterasu: Record<string, Record<'high'|'medium'|'low', string>> = {
     strength: {
       high: "Физическая сила тщетна перед сиянием великого вечного солнца!",
-      medium: "*Закрывается веером от удара:* Твоя сталь упряма... Но солнце вечно!",
-      low: "*Падая на колени, теряя благословение:* Солнце заходит... Твой удар... рассеивает мой рассвет..."
+      medium: "Закрывается веером от удара: Твоя сталь упряма... Но солнце вечно!",
+      low: "Падая на колени, теряя благословение: Солнце заходит... Твой удар... рассеивает мой рассвет... "
     },
     intelligence: {
       high: "Твой мизерный интеллект гаснет при свете божественного огня!",
-      medium: "*Морщится от магического разряда:* Мое сияние дрогнуло... Наглый еретик!",
-      low: "*Пошатываясь в угасающем пламени:* Мой свет остывает... Твоя мудрость разрывает мои небеса..."
+      medium: "Морщится от магического разряда: Мое сияние дрогнуло... Наглый еретик!",
+      low: "Пошатываясь в угасающем пламени: Мой свет остывает... Твоя мудрость разрывает мои небеса..."
     },
     charisma: {
       high: "Перед моим величием меркнет любая смертная харизма!",
-      medium: "*Гневно сверкает глазами:* Твоя дерзкая харизма... заслоняет мой чистый свет!",
-      low: "*Уронив веер, плачет:* Твои праведные слова... вернули тьму в мою пещеру... Я гасну..."
+      medium: "Гневно сверкает глазами: Твоя дерзкая харизма... заслоняет мой чистый свет!",
+      low: "Уронив веер, плачет: Твои праведные слова... вернули тьму в мою пещеру... Я гасну..."
     },
     willpower: {
       high: "Твоя хрупкая воля сгорит дотла в моем небесном пламени!",
-      medium: "*Держится за сердце:* Твое превозмогание... начинает обжигать мою собственную ауру!",
-      low: "*Едва видимая в лучах заката:* Чистая искра твоего духа... победила вечный огонь..."
+      medium: "Держится за сердце: Твое превозмогание... начинает обжигать мою собственную ауру!",
+      low: "Едва видимая в лучах заката: Чистая искра твоего духа... победила вечный огонь..."
     }
   };
 
   const specificJormungand: Record<string, Record<'high'|'medium'|'low', string>> = {
     strength: {
       high: "Твой разрушительный удар бессилен против преград Мирового Змея!",
-      medium: "*Шипит со злостью, сжимая кольца:* Твоя сталь рассекает чешую! Но я вечен!",
-      low: "*Истекая ядом, с хрустом падает:* Мировой круг порван... Кости ломаются... Твоя сила сокрушила вечность..."
+      medium: "Шипит со злостью, сжимая кольца: Твоя сталь рассекает чешую! Но я вечен!",
+      low: "Истекая ядом, с хрустом падает: Мировой круг порван... Кости ломаются... Твоя сила сокрушила вечность..."
     },
     intelligence: {
       high: "Твои хитрые формулы не разорвут бесконечную цепь судьбы!",
-      medium: "*Яростно качает головой:* Твоя магия разума... путает мои вековые циклы!",
-      low: "*Угасающие глаза застилает туман:* Мой змеиный разум растворяется... Судьба побеждена твоей мудростью..."
+      medium: "Яростно качает головой: Твоя магия разума... путает мои вековые циклы!",
+      low: "Угасающие глаза застилает туман: Мой змеиный разум растворяется... Судьба побеждена твоей мудростью..."
     },
     charisma: {
       high: "Ш-ш-ссс... Твое очарование не остановит неотвратимый яд забвения!",
-      medium: "*Трясет хвостом в гневе:* Ш-ш-ссс... Хватит вещать! Твои речи вызывают головную боль!",
-      low: "*Опускается в прах с тихим шепотом:* Мой ядовитый шепот стих... Твой суровый глас победил..."
+      medium: "Трясет хвостом в гневе: Ш-ш-ссс... Хватит вещать! Твои речи вызывают головную боль!",
+      low: "Опускается в прах с тихим шепотом: Мой ядовитый шепот стих... Твой суровый глас победил..."
     },
     willpower: {
       high: "Твой дух крепок, но колесо времени все равно обратит тебя в прах!",
-      medium: "*Тяжело содрогается:* Твоя воля воистину сильна... Мои кольца дрожат!",
-      low: "*Теряя последние силы:* Цепь разорвана... Твоя стальная воля победила судьбу..."
+      medium: "Тяжело содрогается: Твоя воля воистину сильна... Мои кольца дрожат!",
+      low: "Теряя последние силы: Цепь разорвана... Твоя стальная воля победила судьбу..."
     }
   };
 
@@ -845,7 +845,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   const [bossBubbleTimer, setBossBubbleTimer] = useState<any>(null);
 
   const triggerBossBanterBubble = (text: string) => {
-    setBossBanterBubble(text);
+    const cleanText = text.replace(/\*/g, '');
+    setBossBanterBubble(cleanText);
     if (bossBubbleTimer) clearTimeout(bossBubbleTimer);
     const timer = setTimeout(() => {
       setBossBanterBubble(null);
@@ -1012,6 +1013,17 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     } catch { return null; }
   });
 
+  const [showChronicleVictoryModal, setShowChronicleVictoryModal] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('questlog_show_chronicle_victory_modal');
+      return saved === 'true';
+    } catch { return false; }
+  });
+
+  useEffect(() => {
+    safeStorageSet('questlog_show_chronicle_victory_modal', showChronicleVictoryModal ? 'true' : 'false');
+  }, [showChronicleVictoryModal]);
+
   const [isGeneratingBalanceTasks, setIsGeneratingBalanceTasks] = useState(false);
 
   useEffect(() => {
@@ -1113,6 +1125,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
   const processingEncounterRef = useRef(false);
   const preGeneratingChronicleRef = useRef(false);
+  const processingDefeatedRef = useRef(false);
   useEffect(() => {
     if (!aiSettings.enableImages || !effectiveApiKey) return; // if AI is off, no events
     if (processingEncounterRef.current) return;
@@ -1607,6 +1620,77 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       isMounted = false;
     };
   }, [boss?.id, effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel]);
+
+  useEffect(() => {
+    if (!campaign || !boss || !boss.id) return;
+    const isCampaignFinished = campaign.currentEnemyIndex >= campaign.enemies.length - 1;
+    if (!isCampaignFinished) return;
+
+    // If there is an existing chronicle but it doesn't match the current boss name, reset it
+    if (chronicleVictory && !chronicleVictory.title.includes(boss.name)) {
+      setChronicleVictory(null);
+      preGeneratingChronicleRef.current = false;
+      setImageQueue(prev => prev.filter(j => j.type !== 'chronicle_victory'));
+      return;
+    }
+
+    if (chronicleVictory || preGeneratingChronicleRef.current) return;
+
+    let isMounted = true;
+    preGeneratingChronicleRef.current = true;
+
+    (async () => {
+      try {
+        if (effectiveApiKey || effectiveAiBaseUrl) {
+          const victoryChronicle = await generateChronicleVictory(
+            effectiveApiKey,
+            effectiveAiBaseUrl,
+            effectiveAiModel,
+            boss.name,
+            campaign ? campaign.title : 'Неизвестная Земля',
+            player.playerClass || 'Герой',
+            player.stats
+          );
+          if (isMounted && victoryChronicle) {
+            const savedChronicle: ChronicleVictory = {
+              title: victoryChronicle.title,
+              story: victoryChronicle.story,
+              imagePrompt: victoryChronicle.medievalImagePrompt,
+            };
+            setChronicleVictory(savedChronicle);
+            
+            const chronicleJob: any = {
+              id: crypto.randomUUID(),
+              type: 'chronicle_victory',
+              targetId: 'chronicle_victory',
+              prompt: victoryChronicle.medievalImagePrompt,
+              aspectRatio: '1:1',
+              status: 'pending',
+              retryCount: 0
+            };
+            setImageQueue(prev => [...prev, chronicleJob]);
+          }
+        } else {
+          if (isMounted) {
+            setChronicleVictory({
+              title: `Свержение ${boss.name}`,
+              story: `Великий триумф свершился! Доблестный ${player.playerClass || 'Герой'} превозмог все испытания и одолел Владыку по имени ${boss.name}, принеся вечный мир в эти земли. Хроники вечно будут хранить память об этом подвиге.`,
+              imagePrompt: ""
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to pregenerate chronicle victory in background effect", err);
+        if (isMounted) {
+          preGeneratingChronicleRef.current = false;
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [boss?.id, campaign?.id, campaign?.currentEnemyIndex, effectiveApiKey, effectiveAiBaseUrl, effectiveAiModel, player.playerClass, player.stats, chronicleVictory]);
 
   useEffect(() => {
     if (campaign) {
@@ -2449,24 +2533,24 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     setBossHit(true);
     setTimeout(() => setBossHit(false), 400);
     
+    // Sync state calculation
+    const updatedBoss = { ...boss, hp: Math.max(0, boss.hp - damageDealt) };
+    const companionSurvived = updatedBoss.hp > 0;
+
     setBoss(prev => {
       if (!prev) return null;
-      const newHp = Math.max(0, prev.hp - damageDealt);
-      return { ...prev, hp: newHp };
+      return { ...prev, hp: updatedBoss.hp };
     });
     
-    setGmMessage(`${player.familiar.name}: "*Гррр!* ${player.familiar.name} применяет боевой навык «${skill.name}» и ${skill.effectText} Нанесено ${damageDealt} ед. урона!"`);
+    setGmMessage(`${player.familiar.name}: "Гррр! ${player.familiar.name} применяет боевой навык «${skill.name}» и ${skill.effectText} Нанесено ${damageDealt} ед. урона!"`);
 
     // Let boss respond to pet's devastating blow
-    const companionSurvived = boss.hp - damageDealt > 0;
     setTimeout(() => {
       if (companionSurvived) {
-        const updatedBoss = { ...boss, hp: Math.max(0, boss.hp - damageDealt) };
         const reactionLine = getBossBanterLine(updatedBoss, weaknessStat);
-        setGmMessage(`Босс: "${reactionLine}"`);
         triggerBossBanterBubble(reactionLine);
       } else {
-        triggerBossBanterBubble("*Издает сокрушительный предсмертный рык и рассыпается древним прахом...*");
+        triggerBossBanterBubble("Издает сокрушительный предсмертный рык и рассыпается древним прахом...");
       }
     }, 1200);
   };
@@ -2505,67 +2589,17 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     
     damageDealt = Math.floor(damageDealt);
 
-    // Pre-generate victory chronicle when boss hp falls to 20% or less
-    const projectedHp = Math.max(0, boss.hp - damageDealt);
-    const isCampaignFinished = campaign && campaign.currentEnemyIndex >= campaign.enemies.length - 1;
-    if (isCampaignFinished && projectedHp <= boss.maxHp * 0.2 && !chronicleVictory && !preGeneratingChronicleRef.current) {
-      preGeneratingChronicleRef.current = true;
-      (async () => {
-        if (effectiveApiKey || effectiveAiBaseUrl) {
-          try {
-            const victoryChronicle = await generateChronicleVictory(
-              effectiveApiKey,
-              effectiveAiBaseUrl,
-              effectiveAiModel,
-              boss.name,
-              campaign ? campaign.title : 'Неизвестная Земля',
-              player.playerClass || 'Герой',
-              player.stats
-            );
-            if (victoryChronicle) {
-              const savedChronicle: ChronicleVictory = {
-                title: victoryChronicle.title,
-                story: victoryChronicle.story,
-                imagePrompt: victoryChronicle.medievalImagePrompt,
-              };
-              setChronicleVictory(savedChronicle);
-              
-              const chronicleJob: any = {
-                id: crypto.randomUUID(),
-                type: 'chronicle_victory',
-                targetId: 'chronicle_victory',
-                prompt: victoryChronicle.medievalImagePrompt,
-                aspectRatio: '1:1',
-                status: 'pending',
-                retryCount: 0
-              };
-              setImageQueue(prev => [...prev, chronicleJob]);
-            }
-          } catch (err) {
-            console.error("Failed to pregenerate chronicle victory in background", err);
-            preGeneratingChronicleRef.current = false;
-          }
-        } else {
-          setChronicleVictory({
-            title: `Свержение ${boss.name}`,
-            story: `Великий триумф свершился! Доблестный ${player.playerClass || 'Герой'} превозмог все испытания и одолел Владыку по имени ${boss.name}, принеся вечный мир в эти земли. Хроники вечно будут хранить память об этом подвиге.`,
-            imagePrompt: ""
-          });
-        }
-      })();
-    }
-
     setLastDamageDealt(damageDealt);
     setLastDamageColor(STATS[maxStat].hex);
     setBossHit(true);
     setTimeout(() => setBossHit(false), 400);
 
-    let bossSurvived = false;
+    const updatedBoss = { ...boss, hp: Math.max(0, boss.hp - damageDealt) };
+    const bossSurvived = updatedBoss.hp > 0;
     let newPendingDamage = { ...defaultPendingDamage };
 
     setBoss(prev => {
       const newHp = Math.max(0, prev.hp - damageDealt);
-      if (newHp > 0) bossSurvived = true;
       return { ...prev, hp: newHp };
     });
 
@@ -2586,15 +2620,11 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       };
     });
 
-    const updatedBoss = { ...boss, hp: Math.max(0, boss.hp - damageDealt) };
-
     if (bossSurvived) {
       const bossLine = getBossBanterLine(updatedBoss, maxStat);
-      setGmMessage(`Босс: "${bossLine}"`);
       triggerBossBanterBubble(bossLine);
     } else {
-      setGmMessage(`Мастер: "Превосходно! Владыка ${boss.name} повержен твоей непоколебимой силой!"`);
-      triggerBossBanterBubble("*Издает сокрушительный предсмертный рык и рассыпается древним прахом...*");
+      triggerBossBanterBubble("Издает сокрушительный предсмертный рык и рассыпается древним прахом...");
     }
   };
 
@@ -2635,6 +2665,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   };
 
   const handleBossDefeated = async () => {
+    if (processingDefeatedRef.current) return;
+    processingDefeatedRef.current = true;
     setIsGeneratingBoss(true); // Disable button immediately to prevent double clicks
     
     const isCampaignFinished = campaign && campaign.currentEnemyIndex >= campaign.enemies.length - 1;
@@ -2718,11 +2750,13 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       setBoss(nextBoss || generateBoss(finalLevel, player.dailyPointsHistory, player.inventory));
       setGameState(prev => ({ ...prev, defeatedBosses: newDefeated }));
       setIsGeneratingBoss(false);
+      processingDefeatedRef.current = false;
       return;
     }
 
     // Generate chronicle victory first if not already pre-generated
     if (isCampaignFinished) {
+      setShowChronicleVictoryModal(true);
       if (!chronicleVictory) {
         if (effectiveApiKey || effectiveAiBaseUrl) {
            try {
@@ -2907,6 +2941,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         setBossDefeatError(true);
       } finally {
         setIsGeneratingBoss(false);
+        processingDefeatedRef.current = false;
       }
     } else {
       setCampaign(null);
@@ -2917,6 +2952,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         nemesisBoss: boss.isNemesis ? null : prev.nemesisBoss
       }));
       setIsGeneratingBoss(false);
+      processingDefeatedRef.current = false;
     }
   };
 
@@ -3296,7 +3332,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
          {/* Chronicle Victory Modal (Medieval Parchment) */}
         <AnimatePresence>
-          {chronicleVictory && (
+          {showChronicleVictoryModal && chronicleVictory && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3358,6 +3394,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                 <div className="pt-6 text-center">
                   <button
                     onClick={() => {
+                      setShowChronicleVictoryModal(false);
                       setChronicleVictory(null);
                       preGeneratingChronicleRef.current = false;
                     }}
@@ -3836,7 +3873,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                   }`}>
                     {speaker}
                   </h4>
-                  <p className="text-sm text-slate-200 leading-relaxed font-sans">{messageText}</p>
+                  <p className="text-sm text-slate-200 leading-relaxed font-sans">{messageText.replace(/\*/g, '')}</p>
                 </div>
                 <button onClick={() => setGmMessage(null)} className="text-slate-500 hover:text-[#e2e8f0] shrink-0 cursor-pointer">
                   <X size={16} />
