@@ -2831,6 +2831,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         const isSeasonEnded = chronicleToPass.season_info && chronicleToPass.season_info.current_campaign >= chronicleToPass.season_info.total_campaigns;
         
         if (isSeasonEnded) {
+          chronicleToPass = { ...chronicleToPass, previous_season_info: chronicleToPass.season_info } as any;
           delete chronicleToPass.season_info;
           setVictoryMessage("Сезон завершен!");
           setGmMessage("Глава закончена. Открывается новая страница твоей истории...");

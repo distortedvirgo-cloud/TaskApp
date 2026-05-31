@@ -539,6 +539,7 @@ export const regenerateAITown = async (
 
   const response = await openai.chat.completions.create({
     model: model || 'gpt-4o-mini',
+    max_tokens: 16000,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `Regenerate the town now.\n\nCRITICAL REMINDER FOR THINKING MODELS: You MUST return ONLY a valid JSON object matching the exact structure from the system prompt. Your response MUST contain "city_background_prompt" and the "npcs" object.` }
@@ -610,9 +611,18 @@ export const generateAICampaign = async (
     const isNewSeason = !chronicle?.season_info || isReroll;
     let seasonContext = "";
     if (isNewSeason) {
+      let previousSeasonText = "";
+      const previousSeason = (chronicle as any)?.previous_season_info || chronicle?.season_info;
+      
+      if (previousSeason && isReroll) {
+        previousSeasonText = `\n      CRITICAL: You are rerolling a campaign. The PREVIOUS/REJECTED setting was: "${previousSeason.name}" - ${previousSeason.setting_lore}. YOU MUST CREATE A COMPLETELY DIFFERENT THEME AND ENEMIES FROM THIS.`;
+      } else if (previousSeason) {
+        previousSeasonText = `\n      CRITICAL: The previous season was: "${previousSeason.name}" - ${previousSeason.setting_lore}. YOU MUST CREATE A COMPLETELY DIFFERENT THEME AND ENEMIES FOR THIS NEW SEASON.`;
+      }
+
       seasonContext = `
       CRITICAL: You are generating the FIRST campaign of a NEW Season (Story Arc).
-      A Season lasts between 2 and 4 campaigns (weeks).
+      A Season lasts between 2 and 4 campaigns (weeks).${previousSeasonText}
       You MUST generate a global season setting/biome. To ensure maximum variety, the setting and enemies for this season MUST be heavily inspired by these weird and bizarre dark fantasy themes: 
       "${randomThemes.join('" OR "')}"
       Classic fantasy elements like skeletons or bandits are fine as small enemies, but adapt them to fit the bizarre theme (e.g. crystal skeletons or fungi-infested bandits).
@@ -793,10 +803,11 @@ export const generateAICampaign = async (
     const userPrompt = isReroll 
       ? `Player stats: ${JSON.stringify(playerStats)}
     Defeated bosses: ${defeatedBosses.join(', ')}
-    The player is rerolling the campaign. Discard the current story and start a completely new, unrelated campaign narrative.`
+    CRITICAL: The player is rerolling the campaign. Discard the current story and start a completely new, unrelated campaign narrative. YOU MUST INVENT COMPLETELY NEW ENEMY AND BOSS NAMES. DO NOT REUSE NAMES FROM THE "Defeated bosses" LIST!`
       : `Player stats: ${JSON.stringify(playerStats)}
     Defeated bosses: ${defeatedBosses.join(', ')}
-    Current story: ${currentStory}`;
+    Current story: ${currentStory}
+    CRITICAL: YOU MUST INVENT COMPLETELY NEW ENEMY AND BOSS NAMES. DO NOT REUSE NAMES FROM THE "Defeated bosses" LIST!`;
 
     const jsonSchemaReminder = `Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
@@ -896,6 +907,7 @@ export const generateAICampaign = async (
     console.log("[AI Campaign] Requesting campaign generation...");
     const response = await openai.chat.completions.create({
       model: model || 'gpt-4o-mini',
+      max_tokens: 16000,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: finalUserPrompt }
