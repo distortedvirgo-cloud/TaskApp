@@ -207,7 +207,7 @@ export const generateFamiliar = async (
       const data = JSON.parse(content) as { type: string, name: string, imagePrompt?: string, imageUrl?: string };
       if (data.imagePrompt && enableImages) {
         try {
-          data.imageUrl = await generateAIImage(imageApiKey || apiKey, imageBaseUrl || baseUrl, imageModel, data.imagePrompt, enableImages);
+          data.imageUrl = await generateAIImage(imageApiKey || apiKey, imageBaseUrl || baseUrl, imageModel, data.imagePrompt, enableImages, "1:1", 512);
         } catch (e) {
           console.error("Failed to generate pet image", e);
         }
@@ -992,7 +992,7 @@ export const generateAICampaign = async (
   }
 };
 
-const compressImage = async (base64Str: string, maxWidth = 512): Promise<string> => {
+const compressImage = async (base64Str: string, maxWidth = 1024): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -1020,7 +1020,7 @@ const compressImage = async (base64Str: string, maxWidth = 512): Promise<string>
   });
 };
 
-export const generateAIImage = async (apiKey: string, baseUrl: string, model: string, prompt: string, enabled: boolean = true, aspectRatio: string = "1:1") => {
+export const generateAIImage = async (apiKey: string, baseUrl: string, model: string, prompt: string, enabled: boolean = true, aspectRatio: string = "1:1", maxWidth = 1024) => {
   if (!enabled) {
     console.log("[AI Image] Генерация изображений отключена в настройках разработчика.");
     return null;
@@ -1052,10 +1052,10 @@ export const generateAIImage = async (apiKey: string, baseUrl: string, model: st
 
     const data = response.data[0];
     if (data.b64_json) {
-      console.log("[AI Image] Successfully generated image (base64). Compressing...");
+      console.log(`[AI Image] Successfully generated image (base64). Compressing to maxWidth ${maxWidth}...`);
       const fullBase64 = `data:image/png;base64,${data.b64_json}`;
       try {
-        const compressed = await compressImage(fullBase64);
+        const compressed = await compressImage(fullBase64, maxWidth);
         console.log(`[AI Image] Compressed base64 size: ${Math.round(compressed.length / 1024)}KB`);
         return compressed;
       } catch (e) {
@@ -1122,7 +1122,7 @@ export const generateAITrophy = async (
     
     let imageUrl: string | undefined = undefined;
     if (enableAiImages && data.imagePrompt) {
-      const generatedImage = await generateAIImage(imageApiKey || apiKey, imageBaseUrl || baseUrl, imageModel, data.imagePrompt, enableAiImages);
+      const generatedImage = await generateAIImage(imageApiKey || apiKey, imageBaseUrl || baseUrl, imageModel, data.imagePrompt, enableAiImages, "1:1", 512);
       if (generatedImage) {
         imageUrl = generatedImage;
       }

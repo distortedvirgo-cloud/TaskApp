@@ -1188,7 +1188,11 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
       const promises = jobsToProcess.map(async (job) => {
         try {
-           const url = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", job.prompt, true, job.aspectRatio);
+           let maxWidth = 512;
+           if (job.type === 'enemy' || job.type === 'chronicle_victory') {
+              maxWidth = 1024;
+           }
+           const url = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", job.prompt, true, job.aspectRatio, maxWidth);
            if (url) {
               if (job.type === 'city') {
                 setGameState(prev => ({
@@ -2886,7 +2890,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         let firstBoss = aiCampaign.campaign.enemies[0];
         if (firstBoss && firstBoss.imagePrompt && !firstBoss.imageUrl && aiSettings.enableImages) {
             try {
-                firstBoss.imageUrl = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", firstBoss.imagePrompt, true, "1:1") || undefined;
+                firstBoss.imageUrl = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", firstBoss.imagePrompt, true, "1:1", 1024) || undefined;
             } catch (err) {
                 console.error("Failed to generate first boss image", err);
             }
@@ -3048,7 +3052,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       let firstBoss = aiCampaign.campaign.enemies[0];
       if (firstBoss && firstBoss.imagePrompt && !firstBoss.imageUrl && aiSettings.enableImages) {
           try {
-              firstBoss.imageUrl = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", firstBoss.imagePrompt, true, "1:1") || undefined;
+              firstBoss.imageUrl = await generateAIImage(effectiveApiKey, effectiveAiBaseUrl, aiSettings.imageModel || "dall-e-3", firstBoss.imagePrompt, true, "1:1", 1024) || undefined;
           } catch (err) {
               console.error("Failed to generate first boss image", err);
           }
