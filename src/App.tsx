@@ -1642,7 +1642,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     if (lastClosedChronicleBossId === boss.id) return;
 
     // If there is an existing chronicle but it doesn't match the current boss name, reset it
-    if (chronicleVictory && !chronicleVictory.title.includes(boss.name)) {
+    if (chronicleVictory && (!chronicleVictory.title || !chronicleVictory.title.includes(boss.name))) {
       setChronicleVictory(null);
       preGeneratingChronicleRef.current = false;
       setImageQueue(prev => prev.filter(j => j.type !== 'chronicle_victory'));
@@ -3372,13 +3372,13 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                     Персональные Хроники Победы
                   </span>
                   <h2 className="text-2xl md:text-3xl font-black text-[#5C1D1A] leading-tight tracking-normal mt-2">
-                    {chronicleVictory.title}
+                    {chronicleVictory?.title}
                   </h2>
                 </div>
 
                 {/* Medieval victory image section inside Gothic gold arch */}
                 <div className="relative w-full aspect-square max-w-[280px] mx-auto rounded-2xl overflow-hidden shadow-2xl border-4 border-[#3D2513] ring-4 ring-amber-500/10 mb-6 bg-[#E9DCC0] flex items-center justify-center">
-                  {chronicleVictory.imageUrl ? (
+                  {chronicleVictory?.imageUrl ? (
                     <img 
                       src={chronicleVictory.imageUrl} 
                       alt="Boss Defeat" 
@@ -3401,7 +3401,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                 {/* Story description on parchment paper */}
                 <div className="space-y-4 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar text-center">
                   <p className="text-sm md:text-base leading-relaxed text-[#3D2C1E] font-medium tracking-wide italic leading-7">
-                    « {chronicleVictory.story} »
+                    « {chronicleVictory?.story} »
                   </p>
                 </div>
 
