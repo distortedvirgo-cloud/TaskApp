@@ -368,7 +368,8 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
           intelligence: "*Тяжело вздыхая, теряя рассудок:* Великая бездна гаснет... Твои чары... высушили мои глубины...",
           charisma: "*Склонив тяжелую голову:* Довольно... Твой праведный укор... заставляет меня уйти во мрак...",
           willpower: "*Едва дыша среди пены:* Твоя непобедимая воля... иссушила море... Конец близок..."
-        }
+        },
+        isCustom: false
       };
     } else if (isAmaterasu) {
       return {
@@ -389,7 +390,8 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
           intelligence: "*Пошатываясь в угасающем пламени:* Мой свет остывает... Твоя мудрость разрывает мои небеса...",
           charisma: "*Уронив веер, плачет:* Твои праведные слова... вернули тьму в мою пещеру... Я гасну...",
           willpower: "*Едва видимая в лучах заката:* Чистая искра твоего духа... победила вечный огонь..."
-        }
+        },
+        isCustom: false
       };
     } else if (isJormungand) {
       return {
@@ -410,28 +412,124 @@ const generateBoss = (playerLevel: number, dailyPointsHistory: Record<string, nu
           intelligence: "*Угасающие глаза застилает туман:* Мой змеиный разум растворяется... Судьба побеждена твоей мудростью...",
           charisma: "*Опускается в прах с тихим шепотом:* Мой ядовитый шепот стих... Твой суровый глас победил...",
           willpower: "*Теряя последние силы:* Цепь разорвана... Твоя стальная воля победила судьбу..."
-        }
+        },
+        isCustom: false
       };
     } else {
-      return {
+      const name = bossName || "Враг";
+
+      // 4 templates per category for maximum diversity
+      const templates = {
         high: {
-          strength: "Ха-ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
-          intelligence: "Твои заумные мысли и фокусы разума рассыпаются при столкновении со мной!",
-          charisma: "Ты мнишь себя красноречивым лидером? Твои слова бессильны против моего величия!",
-          willpower: "Ты закаляешь свой дух, но моя воля монолитна и не дрогнет от твоих потуг!"
+          strength: [
+            `Ха-ха! Твои попытки махать оружием не пробьют доспехи владыки по имени ${name}!`,
+            `Твоя физическая сила — ничто перед стальной мощью, которой обладает ${name}!`,
+            `Думаешь, тренировки сделают тебя равным мне? ${name} сокрушит твою сталь!`,
+            `Удар прошел мимо! ${name} слишком быстр для твоих неуклюжих атак!`
+          ],
+          intelligence: [
+            `Твои глупые идеи и фокусы разума рассыплются перед интеллектом, который хранит ${name}!`,
+            `Ты считаешь себя мудрецом? Твой скромный разум — лишь тусклая искра рядом с величием ${name}!`,
+            `Твои расчеты не помогут тебе разгадать замыслы, приготовленные ${name}!`,
+            `Твои ментальные плетения блекнут перед лицом истинного знания, подвластного ${name}!`
+          ],
+          charisma: [
+            `Ты мнишь себя лидером и оратором? Твои речи бессильны перед величием ${name}!`,
+            `Твоё дешевое очарование не способно поколебать уверенность, которую имеет ${name}!`,
+            `Хватит вещать свои сладкие сказки, ${name} не поддастся на твои уловки!`,
+            `Твоё присутствие меркнет перед первобытной аурой величия, которую излучает ${name}!`
+          ],
+          willpower: [
+            `Ты закаляешь свой дух, но воля, которой наделен ${name}, монолитна и не дрогнет!`,
+            `Твоё превозмогание — лишь глупое упрямство перед неотвратимой судьбой!`,
+            `Медитируй сколько хочешь, твоя унылая дисциплина разобьется о мою непоколебимость!`,
+            `Твой внутренний стержень согнется и треснет под моим гнетом!`
+          ]
         },
         medium: {
-          strength: "*Слегка морщится от удара:* Хм, твоя физическая мощь заслуживает уважения... Но этого мало!",
-          intelligence: "*Хмурится от энергии:* Твоя хваленая магия сумела задеть мои барьеры!",
-          charisma: "*Недовольно рычит:* Хватит пустых речей! Твой голос раздражает мои уши!",
-          willpower: "*Тяжело содрогается:* Твоё превозмогание... начинает давить на мою уверенность!"
+          strength: [
+            `*${name} слегка пошатывается от тяжелого удара:* Твоя сталь упряма, но моя броня еще крепка!`,
+            `*Слышен звон расколотых доспехов:* Хороший замах, герой! Но ${name} всё еще твердо стоит на ногах!`,
+            `*${name} морщится от боли в плече:* Твоя физическая подготовка впечатляет... но этого мало, чтобы победить!`,
+            `*${name} отступает на шаг, утирая пот:* Удар достиг цели... Твоя сила воистину заслуживает уважения.`
+          ],
+          intelligence: [
+            `*${name} хватается на секунду за лоб:* Твои логические выводы и магия разума сумели пошатнуть мои барьеры!`,
+            `*Хмурится от вспышки ментальной энергии:* Твои тактические инсайты застали меня врасплох! Как ты это узнал?!`,
+            `*Глаза ${name} испускают искры:* Твоя магия мысли... путает и разрушает мои вековые схемы!`,
+            `*Глухо рычит:* Твой холодный расчёт пробивает мою ментальную защиту. Поразительная мудрость.`
+          ],
+          charisma: [
+            `*${name} недовольно рычит, затыкая уши:* Хватит речей! Твой голос проникает под кожу и сеет сомнения среди моих слуг!`,
+            `*Слегка вздрагивает, глядя на твою уверенность:* Твоя харизма... заставляет меня сомневаться в собственных силах! Замолчи!`,
+            `*${name} хмурится от твоего сурового присутствия:* Твоя патетичная и честная речь... начинает ломать мою позицию!`,
+            `*Отводит глаза в сторону:* Твой вдохновляющий пример... разрушает моё влияние на этот мир.`
+          ],
+          willpower: [
+            `*${name} тяжело содрогается от твоей стойкости:* Твоя упрямая дисциплина... сильно давит на мою уверенность!`,
+            `*С трудом преодолевает твое ментальное сопротивление:* Твоё тотальное нежелание сдаваться... обжигает мою веру в себя!`,
+            `*${name} делает глубокий вдох, стиснув зубы:* Откуда в тебе столько духовной стойкости?! Моя воля дает трещину!`,
+            `*Стискивает кулаки от ярости:* Твоя непоколебимая концентрация... заставляет меня дрожать от гнева.`
+          ]
         },
         low: {
-          strength: "*Качаясь на ногах и истекая кровью:* Невероятно... Ты сокрушаешь мое тело... Я теряю силы...",
-          intelligence: "*Схватившись за пылающую голову:* Мой разум затуманился... Твой интеллект выжег мою суть...",
-          charisma: "*Преклонив колена от стыда:* Твой величественный голос... заставил меня покаяться в грехах...",
-          willpower: "*С трудом испуская последний вздох:* Твоя стальная воля... сокрушила мое темное бессмертие..."
+          strength: [
+            `*${name} тяжело оседает на землю, роняя оружие:* Невероятно... Ты сокрушил моё тело... Силы покидают меня...`,
+            `*Истекая кровью и тяжело дыша:* Твоя сокрушительная мощь разбила саму мою суть... ${name} повержен...`,
+            `*${name} пытается подняться, но колени подкашиваются:* Какая разрушительная сила... Ты намного сильнее, чем я думал...`,
+            `*С тяжелым вздохом:* Сама земля содрогнулась от твоего удара. Моя плоть сдается...`
+          ],
+          intelligence: [
+            `*${name} сжимает виски, шатаясь от ментальной боли:* Мой разум затуманился... Твой интеллект выжег мою суть...`,
+            `*Угасающие глаза застилает ментальный туман:* Архивы моих тайных знаний горят... Твоя мудрость превзошла меня...`,
+            `*${name} теряет концентрацию и падает ниц:* Ты просчитал каждое моё движение... Твоя стратегия идеальна...`,
+            `*Шепчет, теряя сознание:* Твой острый ум... рассеял остатки моих заклинаний... Я побежден своей же глупостью.`
+          ],
+          charisma: [
+            `*${name} преклоняет колено с выражением стыда:* Твой величественный голос... заставил меня раскаяться и признать поражение...`,
+            `*Опускает голову во прах:* Твоё честное и лидерское слово звучит сильнее любого меча. ${name} повержен...`,
+            `*Дрожащим голосом:* Твоя несокрушимая праведная аура... заставила меня подчиниться твоей истине...`,
+            `*С тихим стоном:* Твой суровый и величественный глас рассыпал мою гордыню во прах. Я ухожу во тьму...`
+          ],
+          willpower: [
+            `*${name} теряет последние крохи духа:* Твоя упрямая стальная воля... сокрушила моё вечное господство...`,
+            `*С трудом испуская последний вздох:* Твой несломленный дух полностью разорвал цепи моей власти. Я побежден...`,
+            `*Качая головой от бессилия:* Твоё абсолютное самообладание и тренировки стерли меня в порошок... Ты победил...`,
+            `*Шепчет перед тем как растаять:* Чистая и яркая искра твоего духа... поглотила мою ярость. Конец настал...`
+          ]
         }
+      };
+
+      // Hash function to get a stable but random index for each phrase based on the boss's name
+      const getHashIdx = (arr: string[], key: string) => {
+        let hash = 0;
+        const comb = bossName + key;
+        for (let i = 0; i < comb.length; i++) {
+          hash = comb.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return Math.abs(hash) % arr.length;
+      };
+
+      return {
+        high: {
+          strength: templates.high.strength[getHashIdx(templates.high.strength, "hs")],
+          intelligence: templates.high.intelligence[getHashIdx(templates.high.intelligence, "hi")],
+          charisma: templates.high.charisma[getHashIdx(templates.high.charisma, "hc")],
+          willpower: templates.high.willpower[getHashIdx(templates.high.willpower, "hw")]
+        },
+        medium: {
+          strength: templates.medium.strength[getHashIdx(templates.medium.strength, "ms")],
+          intelligence: templates.medium.intelligence[getHashIdx(templates.medium.intelligence, "mi")],
+          charisma: templates.medium.charisma[getHashIdx(templates.medium.charisma, "mc")],
+          willpower: templates.medium.willpower[getHashIdx(templates.medium.willpower, "mw")]
+        },
+        low: {
+          strength: templates.low.strength[getHashIdx(templates.low.strength, "ls")],
+          intelligence: templates.low.intelligence[getHashIdx(templates.low.intelligence, "li")],
+          charisma: templates.low.charisma[getHashIdx(templates.low.charisma, "lc")],
+          willpower: templates.low.willpower[getHashIdx(templates.low.willpower, "lw")]
+        },
+        isCustom: false
       };
     }
   };
@@ -917,7 +1015,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   
   const effectiveApiKey = useGemini ? (aiSettings.geminiApiKey || ((typeof process !== 'undefined' && process.env) ? process.env.GEMINI_API_KEY : '') || '') : (aiSettings.apiKey || '');
   const effectiveAiBaseUrl = useGemini ? "https://generativelanguage.googleapis.com/v1beta/openai/" : (aiSettings.baseUrl || '');
-  const effectiveAiModel = useGemini ? "gemini-3.1-flash-lite-preview" : (aiSettings.model || 'gpt-4o-mini');
+  const effectiveAiModel = useGemini ? "gemini-3.5-flash" : (aiSettings.model || 'gpt-4o-mini');
 
   const [gameState, setGameState] = useState(() => {
     const defaultState = { 
@@ -1595,10 +1693,25 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   useEffect(() => {
     if (!boss || !boss.id) return;
     
-    const statsArr: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
-    const hasAllBanter = boss.banter && statsArr.every(s => typeof boss.banter?.[s] === 'string' && boss.banter[s].trim() !== '');
+    const hasAllBanter = boss.banter && (boss.banter as any).isCustom === true;
     
     if (hasAllBanter) return;
+    if (!effectiveApiKey && !effectiveAiBaseUrl) {
+      // If AI is not configured, just stick with the rich local randomized templates
+      setBoss(prev => {
+        if (prev && prev.id === boss.id && prev.banter && !(prev.banter as any).isCustom) {
+          return {
+            ...prev,
+            banter: {
+              ...prev.banter,
+              isCustom: true
+            }
+          };
+        }
+        return prev;
+      });
+      return;
+    }
     
     let isMounted = true;
     (async () => {
@@ -1617,7 +1730,8 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                 ...prev,
                 banter: {
                   ...prev.banter,
-                  ...generatedBanter
+                  ...generatedBanter,
+                  isCustom: true
                 }
               };
             }
@@ -1626,6 +1740,21 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
         }
       } catch (err) {
         console.error("Failed to pre-generate boss banter", err);
+        if (isMounted) {
+          // If pre-generation fails, mark it as custom/processed to avoid infinite loop attempts
+          setBoss(prev => {
+            if (prev && prev.id === boss.id) {
+              return {
+                ...prev,
+                banter: {
+                  ...prev.banter,
+                  isCustom: true
+                }
+              };
+            }
+            return prev;
+          });
+        }
       }
     })();
     
@@ -4816,34 +4945,34 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                               onClick={handleAttack}
                               disabled={totalPending === 0}
                               style={{ ...gradientStyle, boxShadow }}
-                              className={`w-full py-2 ${totalPending === 0 ? 'bg-[#12141A] text-[#8A8D93] border border-white/5 shadow-inner' : 'text-white border-2 border-white/20 animate-gradient-flow cursor-pointer'} font-extrabold rounded-[11px] transition-all active:scale-95 flex items-center justify-center gap-1.5 relative overflow-hidden text-xs uppercase tracking-wider`}
+                              className={`w-full py-5.5 ${totalPending === 0 ? 'bg-[#12141A] text-[#8A8D93] border border-white/5 shadow-inner' : 'text-white border-2 border-white/25 animate-gradient-flow cursor-pointer'} font-black rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 relative overflow-hidden text-base uppercase tracking-wider shadow-md`}
                             >
                               {totalPending > 0 && (
                                 <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
                               )}
-                              <Sword size={13} className="relative z-10" />
+                              <Sword size={18} className="relative z-10 shrink-0" />
                               <span className="relative z-10">Нанести удар</span>
                             </button>
 
                             {player.familiar && player.familiar.stage !== 'egg' && player.familiar.status === 'active' && (
                               <div className="mt-1.5 text-left">
                                 {familiarSkillUsed ? (
-                                  <div className="w-full py-2 bg-slate-950/40 border border-white/5 text-slate-500 font-bold rounded-[11px] text-[9px] uppercase tracking-wider text-center select-none">
+                                  <div className="w-full py-5.5 bg-slate-950/40 border border-white/5 text-slate-500 font-black rounded-xl text-sm uppercase tracking-wider text-center select-none shadow-inner">
                                     ⚔ Боевой навык перезаряжается...
                                   </div>
                                 ) : (
                                   <button
                                     onClick={handleFamiliarSkill}
-                                    className="w-full py-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold rounded-[11px] border border-blue-400/30 shadow-[0_0_15px_rgba(37,99,235,0.35)] transition-all active:scale-95 flex items-center justify-center gap-1.5 text-[9px] uppercase tracking-wider relative overflow-hidden cursor-pointer"
+                                    className="w-full py-5.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-500 text-white font-black rounded-xl border border-blue-400/30 shadow-[0_0_15px_rgba(37,99,235,0.35)] transition-all active:scale-95 flex items-center justify-center gap-2 text-sm uppercase tracking-wider relative overflow-hidden cursor-pointer shadow-md"
                                   >
                                     <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
-                                    <Zap size={12} className="text-amber-300 animate-pulse shrink-0" />
+                                    <Zap size={16} className="text-amber-300 animate-pulse shrink-0" />
                                     <span className="truncate">
                                       {player.familiar.name}: {FAMILIAR_SKILLS[player.familiar.type]?.name || 'Удар Спутника'} (+{getFamiliarSkillDamage(player.familiar, player.combo)} ур.)
                                     </span>
                                   </button>
                                 )}
-                                <p className="text-[7.5px] text-slate-400 text-center mt-1 leading-snug">
+                                <p className="text-[10px] text-slate-400 text-center mt-1.5 leading-snug">
                                   {FAMILIAR_SKILLS[player.familiar.type]?.description || 'Наносит сокрушительный урон по слабости босса.'} <br/>
                                   <span className="text-emerald-400 font-semibold">(Выполнение ваших реальных дел перезаряжает навык!)</span>
                                 </p>

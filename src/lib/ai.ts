@@ -33,7 +33,7 @@ export const getOpenAIClient = (apiKey: string, baseUrl?: string) => {
             const isJson = params.response_format?.type === 'json_object';
             
             const response = await ai.models.generateContent({
-              model: params.model || 'gemini-3.1-flash-lite-preview',
+              model: params.model || 'gemini-3.5-flash',
               contents: finalContents,
               config: {
                 systemInstruction,
@@ -706,7 +706,8 @@ export const generateAICampaign = async (
     For each boss, assign exactly ONE vulnerability (multiplier 1.5) and optionally ONE resistance (multiplier 0.5) to their stats (strength, intelligence, charisma, willpower). The rest should be 1.0.
     Also generate a small trophy/relic that drops from each boss. The effect should be microscopic to not break game balance (e.g., +1% XP to Willpower, +1.5% damage to weaknesses, -1% to future boss HP).
     For each boss, provide a single emoji that best represents them.
-    For each boss, provide a 'banter' object containing nested health stages ('high' for HP >70%, 'medium' for HP 30%-70%, and 'low' for HP <30%). For each health stage, write 4 short phrases corresponding to the hero attributes (strength, intelligence, charisma, willpower). All statements MUST be written in Russian, spoken strictly in the first-person or representing the boss's reaction/behavior, and reflect their weakening state (e.g. proud/confident when 'high', irritated/pained when 'medium', desperate/dying when 'low').
+    For each boss, provide a 'banter' object containing nested health stages ('high' for HP >70%, 'medium' for HP 30%-70%, and 'low' for HP <30%). For each health stage, write 4 short unique dialogue phrases corresponding to the hero attributes (strength, intelligence, charisma, willpower). All statements MUST be written in Russian, spoken strictly in the first-person or representing the boss's reaction/behavior, and reflect their weakening state. 
+    CRITICAL BANTER DIRECTIVE: The damage banter phrases MUST be highly tailored to the specific boss's name, lore, and visual description instead of being generic. For example, a clockwork inquisitor should speak with mechanical stiffness and tick-tock sounds; a plague-doctor made of moths should flutter, click, and mutter of pestilence. NEVER output the placeholder/example text or generic robotic lines.
     Return ONLY a valid JSON object with this exact structure, no markdown formatting:
     {
       "theme": "Campaign theme/name in Russian",
@@ -728,22 +729,22 @@ export const generateAICampaign = async (
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
           "banter": {
             "high": {
-              "strength": "Ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
-              "intelligence": "Твои заумные мысли рассыпаются при столкновению со мной!",
-              "charisma": "Твои речи бессильны против моего величия!",
-              "willpower": "Твоя воля не дрогнет, но моя монолитна!"
+              "strength": "[1 short proud custom Russian sentence reacting specifically to strength/melee attacks based on this boss's species/theme]",
+              "intelligence": "[1 short proud custom Russian sentence reacting specifically to magic/spells based on this boss's species/theme]",
+              "charisma": "[1 short proud custom Russian sentence reacting specifically to charisma/words based on this boss's species/theme]",
+              "willpower": "[1 short proud custom Russian sentence reacting specifically to willpower/mental aura based on this boss's species/theme]"
             },
             "medium": {
-              "strength": "Хм, твои мускулы крепче, чем казалось... Но этого недостаточно!",
-              "intelligence": "Мгх! Твоё ментальное плетение ранит меня!",
-              "charisma": "Хватит болтать! Твои слова вселяют сомнение в моё сердце...",
-              "willpower": "Арх... Твой непреклонный дух начинает подавлять мою ауру!"
+              "strength": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by physical force, matching boss lore]",
+              "intelligence": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by spells/mind-weaving, matching boss lore]",
+              "charisma": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by eloquence/argument, matching boss lore]",
+              "willpower": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by focus/tenacity, matching boss lore]"
             },
             "low": {
-              "strength": "*Истекая кровью и тяжело дыша:* Этот удар... ломает мои кости! Пощади...",
-              "intelligence": "*Царапая лицо когтями от боли разума:* Прекрати... Мои мысли плавятся от твоих чар!",
-              "charisma": "*С ужасом затыкает уши:* Замолчи! Твой праведный голос выжигает мою сущность!",
-              "willpower": "*Едва удерживая равновесие:* Нет... Мои барьеры разбиты... Твоя чистая воля сильнее!"
+              "strength": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *coughing blood*) when defeated by physical strength]",
+              "intelligence": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *shrieking in agony*) when defeated by wisdom/magic]",
+              "charisma": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *bowing head*) when defeated by charisma/spirit]",
+              "willpower": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *fading away*) when defeated by unyielding will]"
             }
           },
           "dropTrophy": {
@@ -767,22 +768,22 @@ export const generateAICampaign = async (
           "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
           "banter": {
             "high": {
-              "strength": "Твои физические атаки — лишь царапины на моих доспехах!",
-              "intelligence": "И это всё твоё величие разума? Жалкие детские фокусы!",
-              "charisma": "Твоё красноречие звучит жалко. Могучие не слушают слуг!",
-              "willpower": "Твой дух упрям, но я сокрушу любую волю!"
+              "strength": "[1 short grandiose custom Russian phrase reacting to physical attacks, matching the boss's epic scale/form]",
+              "intelligence": "[1 short grandiose custom Russian phrase reacting to magical force, matching the boss's epic scale/form]",
+              "charisma": "[1 short grandiose custom Russian phrase reacting to speaker/charisma, matching the boss's epic scale/form]",
+              "willpower": "[1 short grandiose custom Russian phrase reacting to character's focus, matching the boss's epic scale/form]"
             },
             "medium": {
-              "strength": "Ох... Тяжёлый замах. Твоя сила заслуживает некоторого уважения...",
-              "intelligence": "Ай! Это заклинание обжигает мои ментальные барьеры!",
-              "charisma": "Прекрати этот голос! Твой призыв мешает мне концентрироваться!",
-              "willpower": "Гррх... Твоё превозмогание заставляет меня потеть!"
+              "strength": "[1 pained epic Russian statement of their mighty armor breaching from strength attacks]",
+              "intelligence": "[1 pained epic Russian statement of their ancient minds being stung by player's magic]",
+              "charisma": "[1 pained epic Russian statement of their absolute dominance wavering from player's conviction]",
+              "willpower": "[1 pained epic Russian statement of their supreme will colliding with player's willpower]"
             },
             "low": {
-              "strength": "*Преклонив колено и роняя щит:* Невероятно... Моё бессмертное тело... рушится под твоим напором...",
-              "intelligence": "*Дрожа всем телом от магического шока:* Мой разум осколками осыпается во тьму... Твоя магия непобедима...",
-              "charisma": "*Склонив голову в раскаянии:* Хватит... Твой приговор справедлив. Я побежден твоим величием...",
-              "willpower": "*Теряя последние искры жизни:* Твоя воля... разорвала моё проклятое бессмертие... Конец близок..."
+              "strength": "[1 epic final dying words in Russian reflecting physical collapse, e.g. *falling down, shattering*]",
+              "intelligence": "[1 epic final dying words in Russian reflecting mental/magic annihilation, e.g. *flickering, breaking*]",
+              "charisma": "[1 epic final dying words in Russian reflecting moral/words submission, e.g. *kneeling, repenting*]",
+              "willpower": "[1 epic final dying words in Russian reflecting extinction of essence, e.g. *soul dissolving*]"
             }
           },
           "dropTrophy": {
@@ -830,22 +831,22 @@ export const generateAICampaign = async (
           "multipliers": { "strength": 1.5, "intelligence": 0.5, "charisma": 1.0, "willpower": 1.0 },
           "banter": {
             "high": {
-              "strength": "Ха! Твоя физическая сила забавляет меня, смертный! Попробуй ударить крепче!",
-              "intelligence": "Твои заумные мысли рассыпаются при столкновению со мной!",
-              "charisma": "Твои речи бессильны против моего величия!",
-              "willpower": "Твоя воля не дрогнет, но моя монолитна!"
+              "strength": "[1 short proud custom Russian sentence reacting specifically to strength/melee attacks based on this boss's species/theme]",
+              "intelligence": "[1 short proud custom Russian sentence reacting specifically to magic/spells based on this boss's species/theme]",
+              "charisma": "[1 short proud custom Russian sentence reacting specifically to charisma/words based on this boss's species/theme]",
+              "willpower": "[1 short proud custom Russian sentence reacting specifically to willpower/mental aura based on this boss's species/theme]"
             },
             "medium": {
-              "strength": "Хм, твои мускулы крепче, чем казалось... Но этого недостаточно!",
-              "intelligence": "Мгх! Твоё ментальное плетение ранит меня!",
-              "charisma": "Хватит болтать! Твои слова вселяют сомнение в моё сердце...",
-              "willpower": "Арх... Твой непреклонный дух начинает подавлять мою ауру!"
+              "strength": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by physical force, matching boss lore]",
+              "intelligence": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by spells/mind-weaving, matching boss lore]",
+              "charisma": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by eloquence/argument, matching boss lore]",
+              "willpower": "[1 short moderately pained/irritated/cracking custom Russian sentence when damaged by focus/tenacity, matching boss lore]"
             },
             "low": {
-              "strength": "*Истекая кровью и тяжело дыша:* Этот удар... ломает мои кости! Пощади...",
-              "intelligence": "*Царапая лицо когтями от боли разума:* Прекрати... Мои мысли плавятся от твоих чар!",
-              "charisma": "*С ужасом затыкает уши:* Замолчи! Твой праведный голос выжигает мою сущность!",
-              "willpower": "*Едва удерживая равновесие:* Нет... Мои барьеры разбиты... Твоя чистая воля сильнее!"
+              "strength": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *coughing blood*) when defeated by physical strength]",
+              "intelligence": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *shrieking in agony*) when defeated by wisdom/magic]",
+              "charisma": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *bowing head*) when defeated by charisma/spirit]",
+              "willpower": "[1 desperate/dying custom Russian sentence (optionally with short action in asterisks like *fading away*) when defeated by unyielding will]"
             }
           },
           "dropTrophy": {
@@ -869,22 +870,22 @@ export const generateAICampaign = async (
           "multipliers": { "strength": 1.0, "intelligence": 1.5, "charisma": 1.0, "willpower": 0.5 },
           "banter": {
             "high": {
-              "strength": "Твои физические атаки — лишь царапины на моих доспехах!",
-              "intelligence": "И это всё твоё величие разума? Жалкие фокусы!",
-              "charisma": "Твоё красноречие звучит жалко. Могучие не слушают слуг!",
-              "willpower": "Твой дух упрям, но я сокрушу любую волю!"
+              "strength": "[1 short grandiose custom Russian phrase reacting to physical attacks, matching the boss's epic scale/form]",
+              "intelligence": "[1 short grandiose custom Russian phrase reacting to magical force, matching the boss's epic scale/form]",
+              "charisma": "[1 short grandiose custom Russian phrase reacting to speaker/charisma, matching the boss's epic scale/form]",
+              "willpower": "[1 short grandiose custom Russian phrase reacting to character's focus, matching the boss's epic scale/form]"
             },
             "medium": {
-              "strength": "Ох... Тяжёлый замах. Твоя сила заслуживает некоторого уважения...",
-              "intelligence": "Ай! Это заклинание обжигает мои ментальные барьеры!",
-              "charisma": "Прекрати этот голос! Твой призыв мешает мне концентрироваться!",
-              "willpower": "Гррх... Твоё превозмогание заставляет меня потеть!"
+              "strength": "[1 pained epic Russian statement of their mighty armor breaching from strength attacks]",
+              "intelligence": "[1 pained epic Russian statement of their ancient minds being stung by player's magic]",
+              "charisma": "[1 pained epic Russian statement of their absolute dominance wavering from player's conviction]",
+              "willpower": "[1 pained epic Russian statement of their supreme will colliding with player's willpower]"
             },
             "low": {
-              "strength": "*Преклонив колено и роняя щит:* Невероятно... Моё бессмертное тело... рушится под твоим напором...",
-              "intelligence": "*Дрожа всем телом от магического шока:* Мой разум осколками осыпается во тьму... Твоя магия непобедима...",
-              "charisma": "*Склонив голову в раскаянии:* Хватит... Твой приговор справедлив. Я побежден твоим величием...",
-              "willpower": "*Теряя последние искры жизни:* Твоя воля... разорвала моё проклятое бессмертие... Конец близок..."
+              "strength": "[1 epic final dying words in Russian reflecting physical collapse, e.g. *falling down, shattering*]",
+              "intelligence": "[1 epic final dying words in Russian reflecting mental/magic annihilation, e.g. *flickering, breaking*]",
+              "charisma": "[1 epic final dying words in Russian reflecting moral/words submission, e.g. *kneeling, repenting*]",
+              "willpower": "[1 epic final dying words in Russian reflecting extinction of essence, e.g. *soul dissolving*]"
             }
           },
           "dropTrophy": {
@@ -962,7 +963,10 @@ export const generateAICampaign = async (
         imagePrompt: e.imagePrompt,
         defeated: false,
         isNemesis: !isMiniBoss && !!nemesisBoss,
-        banter: e.banter,
+        banter: e.banter ? {
+          ...e.banter,
+          isCustom: true
+        } : undefined,
         dropTrophy: e.dropTrophy ? {
           id: crypto.randomUUID(),
           ...e.dropTrophy
