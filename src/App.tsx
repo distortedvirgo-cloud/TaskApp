@@ -1000,12 +1000,6 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     } catch { return null; }
   });
 
-  const [masterQuestCampaignId, setMasterQuestCampaignId] = useState<string | null>(() => {
-    try {
-      return localStorage.getItem('questlog_master_quest_campaign_id');
-    } catch { return null; }
-  });
-
   const [chronicleVictory, setChronicleVictory] = useState<ChronicleVictory | null>(() => {
     try {
       const saved = localStorage.getItem('questlog_chronicle_victory');
@@ -1061,14 +1055,6 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
   }, [masterQuestBossId]);
 
   useEffect(() => {
-    if (masterQuestCampaignId) {
-      safeStorageSet('questlog_master_quest_campaign_id', masterQuestCampaignId);
-    } else {
-      localStorage.removeItem('questlog_master_quest_campaign_id');
-    }
-  }, [masterQuestCampaignId]);
-
-  useEffect(() => {
     safeStorageSet('questlog_chronicle_victory', chronicleVictory ? JSON.stringify(chronicleVictory) : '');
   }, [chronicleVictory]);
 
@@ -1095,9 +1081,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
 
   useEffect(() => {
     if (activeTab !== 'boss') return;
-    if (masterQuest) return;
-    if (boss && boss.id && boss.id === masterQuestBossId) return;
-    if (campaign && campaign.id && masterQuestCampaignId === campaign.id) return;
+    if (!masterQuest) return;
 
     let threshold = 1;
     if (player.level >= 50) {
@@ -1106,36 +1090,12 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       threshold = 2;
     }
 
-    const statsToCheck: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
     const counts = gameState.weeklyCompletedCounts || { strength: 0, intelligence: 0, charisma: 0, willpower: 0, unknown: 0 };
-    const neglectedStats = statsToCheck.filter(s => (counts[s] || 0) < threshold);
-
-    if (neglectedStats.length > 0) {
-      let eligible = neglectedStats.filter(s => s !== lastMasterQuestStat);
-      if (eligible.length === 0) {
-        eligible = neglectedStats;
-      }
-      
-      const minCount = Math.min(...eligible.map(s => counts[s] || 0));
-      const worstStats = eligible.filter(s => (counts[s] || 0) === minCount);
-      const stat = worstStats[Math.floor(Math.random() * worstStats.length)];
-
-      const newQuest: MasterQuest = {
-        stat,
-        target: 30,
-        current: 0
-      };
-      setMasterQuest(newQuest);
-      setLastMasterQuestStat(stat);
-      if (boss && boss.id) {
-        setMasterQuestBossId(boss.id);
-      }
-      if (campaign && campaign.id) {
-        setMasterQuestCampaignId(campaign.id);
-      }
-      setGmMessage(`Мастер: "На этой неделе ты выполнил недостаточно задач характеристики ${STATS[stat]?.name || stat} (выполнено: ${counts[stat] || 0}, требуется: ${threshold}). Логово босса заблокировано, пока ты не восстановишь баланс!"`);
+    if ((counts[masterQuest.stat] || 0) >= threshold) {
+      setMasterQuest(null);
+      setGmMessage(`Мастер: "Баланс восстановлен! Ты выполнил достаточно задач характеристики ${STATS[masterQuest.stat]?.name || masterQuest.stat} на этой неделе, доступ к логову босса вновь открыт."`);
     }
-  }, [activeTab, player.level, gameState.weeklyCompletedCounts, masterQuest, boss, masterQuestBossId, lastMasterQuestStat, campaign, masterQuestCampaignId]);
+  }, [activeTab, player.level, gameState.weeklyCompletedCounts, masterQuest]);
 
   const processingEncounterRef = useRef(false);
   const preGeneratingChronicleRef = useRef(false);
@@ -1523,6 +1483,41 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
       const lastWeeklyMonday = getMonday(lastWeeklyReset);
 
       if (currentMonday.getTime() > lastWeeklyMonday.getTime()) {
+        // Evaluate Master Trial check on previous week's performance BEFORE resetting
+        let threshold = 1;
+        if (player.level >= 50) {
+          threshold = 3;
+        } else if (player.level >= 25) {
+          threshold = 2;
+        }
+
+        const statsToCheck: StatType[] = ['strength', 'intelligence', 'charisma', 'willpower'];
+        const counts = gameState.weeklyCompletedCounts || { strength: 0, intelligence: 0, charisma: 0, willpower: 0, unknown: 0 };
+        const neglectedStats = statsToCheck.filter(s => (counts[s] || 0) < threshold);
+
+        if (neglectedStats.length > 0 && !masterQuest) {
+          let eligible = neglectedStats.filter(s => s !== lastMasterQuestStat);
+          if (eligible.length === 0) {
+            eligible = neglectedStats;
+          }
+          
+          const minCount = Math.min(...eligible.map(s => counts[s] || 0));
+          const worstStats = eligible.filter(s => (counts[s] || 0) === minCount);
+          const stat = worstStats[Math.floor(Math.random() * worstStats.length)];
+
+          const newQuest: MasterQuest = {
+            stat,
+            target: 30,
+            current: 0
+          };
+          setMasterQuest(newQuest);
+          setLastMasterQuestStat(stat);
+          if (boss && boss.id) {
+            setMasterQuestBossId(boss.id);
+          }
+          setGmMessage(`Мастер: "На прошлой неделе ты выполнил недостаточно задач характеристики ${STATS[stat]?.name || stat} (выполнено: ${counts[stat] || 0}, требуется: ${threshold}). Логово босса заблокировано, пока ты не восстановишь баланс!"`);
+        }
+
         setGameState(prev => ({
           ...prev,
           lastWeeklyReset: now.getTime(),
@@ -1577,7 +1572,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
     checkResets();
     const interval = setInterval(checkResets, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, [tasks, boss, gameState.lastWeeklyReset, campaign]);
+  }, [tasks, boss, gameState.lastWeeklyReset, campaign, player, lastMasterQuestStat, masterQuest, gameState.weeklyCompletedCounts]);
 
   useEffect(() => {
     safeStorageSet('questlog_tasks_v2', JSON.stringify(tasks));
@@ -4284,7 +4279,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
           {activeTab === 'boss' && (
             <div className="flex flex-col flex-1 space-y-3 min-h-full">
               {masterQuest ? (
-                <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[50vh]">
+                <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-[50vh]" style={{ zoom: 0.8 }}>
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -4527,7 +4522,7 @@ const uuid = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto
                     }
 
                     return (
-                      <div className="flex flex-col flex-1 gap-3 min-h-0 pb-1">
+                      <div className="flex flex-col flex-1 gap-3 min-h-0 pb-1" style={{ zoom: 0.8 }}>
                         {/* Boss Info Card */}
                         <motion.div 
                           className={`w-full flex-1 relative flex flex-col rounded-[20px] overflow-hidden border-2 ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].border : 'border-white/5'} ${campaign ? THEME_COLORS[campaign.colorTheme || 'slate'].bgTransparent : 'bg-[#1A1D24]/40'} shadow-[0_0_30px_rgba(0,0,0,0.5)] min-h-[300px]`}
